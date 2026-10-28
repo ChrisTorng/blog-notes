@@ -97,7 +97,12 @@ try {
     })
   ).json()
   const firstPublished = note.published_at
-  const rendered = await (await call(`/notes/${note.id}/`)).text()
+  const themed = await call(`/notes/${note.id}/`)
+  verify(
+    themed.headers.get('X-Notes-Theme') === 'main-site',
+    'public page uses the main site shell'
+  )
+  const rendered = await themed.text()
   const jsonld = rendered.match(
     /<script type="application\/ld\+json">(.*?)<\/script>/s
   )?.[1]
@@ -131,7 +136,11 @@ try {
     note.published_at === firstPublished,
     'editing retains original publication time and permalink'
   )
-  for (const path of ['/notes/style.css', '/notes/editor.js', '/notes/editor/'])
+  for (const path of [
+    '/notes/editor.css',
+    '/notes/editor.js',
+    '/notes/editor/',
+  ])
     await call(path)
   const head = await call(`/notes/${note.id}/`, { method: 'HEAD' })
   verify(

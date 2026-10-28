@@ -7,7 +7,7 @@
     "dev": "wrangler dev --local --ip 127.0.0.1 --port 8787",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "test": "node --test tests/*.test.js",
-    "check": "node --check src/index.js && node --check src/views.js && node --check src/auth.js && node --check src/data.js && node --check src/feeds.js && node --check src/http.js && node --check public/notes/editor.js && npm test",
+    "check": "node --check src/index.js && node --check src/views.js && node --check src/auth.js && node --check src/data.js && node --check src/feeds.js && node --check src/http.js && node --check src/site-theme.js && node --check public/notes/editor.js && npm test",
     "deploy": "wrangler deploy",
     "test:integration": "node scripts/integration-test.mjs",
     "types": "wrangler types --include-runtime=false"

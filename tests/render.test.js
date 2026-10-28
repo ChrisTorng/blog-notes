@@ -33,3 +33,15 @@ test('malformed blog RSS is rejected and fetch failures degrade explicitly', asy
   assert.equal(result.items.length, 0)
   assert.ok(result.error)
 })
+
+test('automatic title preserves literal angle brackets and removes Markdown syntax only', () => {
+  const markdown = '測試項目 test <script>alert("a");</script> > 3'
+  const html = individualPage(
+    { ...note, title: null, markdown },
+    'https://example.org'
+  )
+  const ld = html.match(
+    /<script type="application\/ld\+json">(.*?)<\/script>/s
+  )[1]
+  assert.equal(JSON.parse(ld).headline, markdown)
+})

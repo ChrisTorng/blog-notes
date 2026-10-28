@@ -7,3 +7,7 @@ coverage/
 .DS_Store
 *.log
 .local/
+
+# Local diagnostics and screenshots
+TEST-RESULTS.md
+docs/*-preview.png

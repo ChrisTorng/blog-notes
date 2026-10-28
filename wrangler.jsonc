@@ -8,24 +8,27 @@
     "directory": "./public",
     "binding": "ASSETS",
     "run_worker_first": true,
-    "html_handling": "none",
+    "html_handling": "none"
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "blog-notes",
       "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "migrations",
-    },
+      "migrations_dir": "migrations"
+    }
   ],
   "vars": {
     "SITE_URL": "https://christorng.idv.tw",
     "BLOG_FEED_URL": "https://christorng.idv.tw/feed.xml",
     "BLOG_INDEX_URL": "https://christorng.idv.tw/articles-index.json",
+    "BLOG_SHELL_URL": "https://christorng.idv.tw/notes-shell/"
   },
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1,
-  },
+    "head_sampling_rate": 1
+  }
 }

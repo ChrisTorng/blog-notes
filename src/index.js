@@ -20,6 +20,8 @@ import {
   pager,
   renderMarkdown,
 } from './views.js'
+import { withSiteTheme } from './site-theme.js'
+import { noteTitle } from './views.js'
 import { readLimitedText } from './http.js'
 import { allRssXml, readBlogItems, rssXml, sitemapXml } from './feeds.js'
 
@@ -86,7 +88,13 @@ async function handleAdmin(req, env, url, path) {
     const data = await readPayload(req)
     if (typeof data.markdown !== 'string' || data.markdown.length > 30000)
       return json({ error: 'Markdown 格式或長度無效' }, 400)
-    return json({ html: renderMarkdown(data.markdown) })
+    return json({
+      html: renderMarkdown(data.markdown),
+      title: noteTitle({
+        title: typeof data.title === 'string' ? data.title.slice(0, 160) : null,
+        markdown: data.markdown,
+      }),
+    })
   }
   if (path === '/notes/api/admin/' || path === '/notes/api/admin') {
     if (req.method === 'GET')
@@ -174,7 +182,7 @@ async function combinedPage(env, page, tag = '', api = false) {
   })
 }
 
-export default {
+const backend = {
   async fetch(req, env) {
     if (req.method === 'HEAD') {
       const response = await this.fetch(
@@ -318,5 +326,28 @@ export default {
         bad ? 400 : 500
       )
     }
+  },
+}
+
+export default {
+  async fetch(req, env) {
+    if (req.method === 'HEAD') {
+      const response = await this.fetch(
+        new Request(req, { method: 'GET' }),
+        env
+      )
+      return new Response(null, {
+        status: response.status,
+        headers: response.headers,
+      })
+    }
+    const response = await backend.fetch(req, env)
+    if (
+      response.ok &&
+      response.headers.get('Content-Type')?.startsWith('text/html') &&
+      !/^\/notes\/editor\/?$/.test(new URL(req.url).pathname)
+    )
+      return withSiteTheme(response, env)
+    return response
   },
 }

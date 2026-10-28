@@ -7,3 +7,5 @@ SITE_URL=https://christorng.idv.tw
 ALLOWED_DEV_ORIGIN=http://localhost:3000
 
 BLOG_INDEX_URL=http://127.0.0.1:3000/articles-index.json
+
+BLOG_SHELL_URL=http://127.0.0.1:3000/notes-shell/

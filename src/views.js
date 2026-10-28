@@ -26,15 +26,36 @@ export function renderMarkdown(input) {
   return md.render(String(input ?? ''))
 }
 export function plainText(markdown) {
-  return String(markdown ?? '')
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/[`*_>#~|]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  const text = []
+  function visit(tokens) {
+    for (const token of tokens) {
+      if (token.children) visit(token.children)
+      else if (
+        ['text', 'code_inline', 'code_block', 'fence'].includes(token.type)
+      )
+        text.push(token.content)
+      else if (token.type === 'image') text.push(token.content)
+      else if (
+        token.type === 'softbreak' ||
+        token.type === 'hardbreak' ||
+        token.block
+      )
+        text.push(' ')
+    }
+  }
+  visit(md.parse(String(markdown ?? ''), {}))
+  return text.join('').replace(/\s+/g, ' ').trim()
 }
 export function noteTitle(note) {
-  return note.title || plainText(note.markdown).slice(0, 66) || '隨筆'
+  return (
+    note.title ||
+    plainText(
+      String(note.markdown)
+        .split(/\r?\n/)
+        .find((line) => line.trim()) || ''
+    ).slice(0, 160) ||
+    '隨筆'
+  )
 }
 export function notePath(id) {
   return `/notes/${encodeURIComponent(id)}/`
@@ -53,15 +74,7 @@ export function pageHtml({
 }) {
   const url = canonical ? new URL(canonical, siteUrl).href : `${siteUrl}/notes/`
   const desc = String(description || 'ChrisTorng 學習天地的隨筆').slice(0, 180)
-  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${htmlEscape(title)} | ChrisTorng 學習天地</title><meta name="description" content="${htmlEscape(desc)}"><meta name="robots" content="${robots}">
-<link rel="canonical" href="${htmlEscape(url)}"><meta property="og:type" content="${type}"><meta property="og:title" content="${htmlEscape(title)}">
-<meta property="og:description" content="${htmlEscape(desc)}"><meta property="og:url" content="${htmlEscape(url)}">
-${feed ? '<link rel="alternate" type="application/rss+xml" title="隨筆 RSS" href="/notes/feed.xml">' : ''}
-<link rel="stylesheet" href="/notes/style.css">${head}</head>
-<body><div class="shell"><header class="site-header"><a class="brand" href="/">ChrisTorng 學習天地</a>
-<nav aria-label="主要導覽"><a href="/">最新</a><a href="/blog/">文章</a><a href="/notes/" ${current === 'notes' ? 'aria-current="page"' : ''}>隨筆</a><a href="/notes/all/" ${current === 'all' ? 'aria-current="page"' : ''}>全部</a><a href="/tags/">類別</a></nav></header>
-<main>${body}</main><footer class="footer"><a href="/notes/feed.xml">隨筆 RSS</a> · <a href="/feed.xml">文章 RSS</a> · <a href="/notes/editor/">編輯隨筆</a></footer></div></body></html>`
+  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${htmlEscape(title)} | ChrisTorng 學習天地</title><meta name="description" content="${htmlEscape(desc)}"><meta name="robots" content="${robots}"><link rel="canonical" href="${htmlEscape(url)}"><meta property="og:type" content="${type}"><meta property="og:title" content="${htmlEscape(title)}"><meta property="og:description" content="${htmlEscape(desc)}"><meta property="og:url" content="${htmlEscape(url)}">${feed ? '<link rel="alternate" type="application/rss+xml" title="隨筆 RSS" href="/notes/feed.xml">' : ''}${head}</head><body><main>${body}</main></body></html>`
 }
 export function tagLinks(note) {
   return (note.tags || [])
@@ -76,7 +89,7 @@ export function noteCard(note, { full = true } = {}) {
   const date = note.published_at || note.created_at
   return `<article class="entry note"><div class="entry-meta"><time datetime="${htmlEscape(date)}">${htmlEscape(new Date(date).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }))}</time> <span class="type">隨筆</span></div>
 ${note.title ? `<h2><a href="${link}">${htmlEscape(note.title)}</a></h2>` : ''}
-<div class="prose">${full ? renderMarkdown(note.markdown) : `<p>${htmlEscape(plainText(note.markdown).slice(0, 320))}</p>`}</div>
+<div class="prose dark:prose-invert">${full ? renderMarkdown(note.markdown) : `<p>${htmlEscape(plainText(note.markdown).slice(0, 320))}</p>`}</div>
 <div class="entry-foot"><span>${tagLinks(note)}</span><a class="permalink" href="${link}">永久連結</a></div></article>`
 }
 export function articleCard(item) {
@@ -124,23 +137,13 @@ export function individualPage(note, siteUrl) {
     body: `<p class="back"><a href="/notes/">← 隨筆列表</a></p><h1 class="note-heading">${htmlEscape(title)}</h1>${noteCard(note)}`,
   })
 }
-export function editorPage(siteUrl) {
-  return pageHtml({
-    title: '編輯隨筆',
-    robots: 'noindex,nofollow',
-    canonical: '/notes/editor/',
-    siteUrl,
-    feed: false,
-    body: `
-<div class="page-heading"><h1>編輯隨筆</h1><p>Markdown 草稿與發布管理。寫入資料必須通過 Cloudflare Access 驗證。</p></div>
-<section class="editor"><div id="auth" class="auth-bar"><label for="localToken">本機開發 Token（正式環境不需要）</label><input id="localToken" autocomplete="off" type="password" placeholder="僅本機測試時填寫"><button id="saveToken" type="button">本機登入</button> <span id="authStatus"></span></div>
-<div class="field"><label for="noteSelect">選擇已存在的隨筆</label><select id="noteSelect"><option value="">新增隨筆</option></select> <button type="button" id="newNote">新增</button></div>
-<div class="field"><label for="title">標題（選填）</label><input id="title" maxlength="160" placeholder="短訊息可以不填標題"></div>
-<div class="field"><label for="markdown">Markdown 內容</label><textarea id="markdown" rows="11" maxlength="30000" placeholder="今天發現……"></textarea></div>
-<div class="field"><label>主題標籤</label><div class="tag-select">${allTags.map((t) => `<label><input type="checkbox" class="tag-check" value="${t.id}"> ${htmlEscape(t.displayName)}</label>`).join('')}</div></div>
-<div class="field"><label for="status">發布狀態</label><select id="status"><option value="draft">草稿</option><option value="published">公開發布</option></select></div>
-<div class="buttons"><button id="previewBtn" type="button">預覽 Markdown</button><button id="saveBtn" class="primary" type="button">儲存</button><button id="deleteBtn" class="danger" type="button" disabled>刪除</button></div>
-<p id="message" role="status" aria-live="polite"></p><div id="preview" class="prose preview"></div></section>
-<script type="module" src="/notes/editor.js"></script>`,
-  })
+export function editorPage() {
+  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>編輯隨筆</title><link rel="stylesheet" href="/notes/editor.css"></head><body>
+<main class="workspace">
+<header class="toolbar"><h1>隨筆 <small>Notes</small></h1><a href="/notes/">瀏覽隨筆 ↗</a><div class="note-picker"><label class="sr-only" for="noteSelect">選擇已存在的隨筆</label><select id="noteSelect"><option value="">新增隨筆</option></select><button id="newNote" type="button">新增</button></div><span id="authStatus" role="status"></span><button id="toggleAuth" type="button" aria-controls="auth" aria-expanded="false">本機登入</button></header>
+<section id="auth" class="auth-bar" hidden><label for="localToken">本機開發 Token</label><input id="localToken" type="password" autocomplete="off"><button id="saveToken" type="button">登入</button></section>
+<div class="title-row"><label for="title">標題</label><input id="title" maxlength="160" placeholder="選填；留白時取內文第一行"></div>
+<div class="split-view"><section class="markdown-pane"><label for="markdown">Markdown</label><textarea id="markdown" spellcheck="false" maxlength="30000" placeholder="寫下一點想法……"></textarea></section><section class="preview-pane" aria-label="即時預覽"><div class="pane-label">即時預覽</div><h1 id="previewTitle"></h1><div id="preview" class="prose dark:prose-invert"></div></section></div>
+<footer class="action-bar"><fieldset class="tag-select"><legend class="sr-only">主題標籤</legend>${allTags.map((t) => `<label><input type="checkbox" class="tag-check" value="${t.id}"> ${htmlEscape(t.displayName)}</label>`).join('')}</fieldset><label class="sr-only" for="status">發布狀態</label><select id="status"><option value="draft">草稿</option><option value="published">公開發布</option></select><button id="saveBtn" class="primary" type="button">儲存</button><button id="deleteBtn" class="danger" type="button" disabled>刪除</button><p id="message" role="status" aria-live="polite"></p></footer>
+</main><script type="module" src="/notes/editor.js"></script></body></html>`
 }

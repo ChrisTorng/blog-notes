@@ -1,0 +1,19 @@
+
+/* Notes public content. Global appearance is inherited from the main site. */
+.notes-public .page-heading { @apply space-y-2 border-b border-gray-200 pt-6 pb-8 dark:border-gray-700; }
+.notes-public .page-heading h1, .notes-public > .note-heading { @apply text-3xl leading-9 font-extrabold tracking-tight sm:text-4xl sm:leading-10 md:text-6xl md:leading-14; color:var(--site-accent); }
+.notes-public h1 small { @apply text-lg font-normal text-gray-500 dark:text-gray-400; }
+.notes-public .page-heading p, .notes-public .entry-meta { @apply text-base leading-6 text-gray-500 dark:text-gray-400; }
+.notes-public .entry { @apply border-b border-gray-200 py-8 dark:border-gray-700; }
+.notes-public .entry h2 { @apply text-2xl leading-8 font-bold tracking-tight; }
+.notes-public .entry h2 a { @apply text-gray-800 dark:text-gray-200; }
+.notes-public .entry .prose { @apply max-w-none; }
+.notes-public .entry-foot { @apply mt-5 flex items-center justify-between gap-4; }
+.notes-public .tag, .notes-public .permalink, .notes-public .back a, .notes-public .pager a { @apply text-primary-500 hover:text-primary-600 dark:hover:text-primary-400; }
+.notes-public .type { @apply ml-2 text-sm; }
+.notes-public .filters { @apply mt-5 flex flex-wrap gap-4; }
+.notes-public .filters a { @apply text-gray-500 dark:text-gray-400; }
+.notes-public .filters [aria-current=page] { @apply text-primary-500 font-bold; }
+.notes-public .pager { @apply flex justify-between gap-4 py-8; }
+.notes-public .back { @apply py-6; }
+.notes-public .warning { @apply text-amber-700 dark:text-amber-400; }

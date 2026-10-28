@@ -32,11 +32,44 @@ replaceOnce(
     ? [{ href: '/notes/', title: '隨筆' }, { href: '/notes/all/', title: '全部' }]
     : []),`
 )
-const route = 'app/articles-index.json/route.ts'
-const target = path.join(blog, route),
-  source = fs.readFileSync(path.join(here, 'blog', route), 'utf8')
-if (fs.existsSync(target) && fs.readFileSync(target, 'utf8') !== source)
-  throw Error(`Refusing to overwrite existing ${route}`)
-fs.mkdirSync(path.dirname(target), { recursive: true })
-fs.writeFileSync(target, source)
-console.log(`Installed local Notes integration in ${blog}`)
+
+replaceOnce(
+  'components/Link.tsx',
+  '/^\\/notes(?:\\/|$)/',
+  '  if (isInternalLink) {',
+  `  if (isInternalLink && /^\\/notes(?:\\/|$)/.test(href)) {
+    return <a className={linkClassName} href={href} {...rest} />
+  }
+
+  if (isInternalLink) {`
+)
+const css = fs.readFileSync(path.join(here, 'notes-public.css'), 'utf8')
+const cssPath = path.join(blog, 'css/tailwind.css')
+if (!fs.readFileSync(cssPath, 'utf8').includes('/* Notes public content.'))
+  fs.appendFileSync(cssPath, css)
+for (const route of [
+  'app/articles-index.json/route.ts',
+  'app/notes-shell/page.tsx',
+  'components/notes/NotesSlot.tsx',
+  'components/notes/DraftTimeline.tsx',
+]) {
+  const source = fs.readFileSync(path.join(here, 'blog', route), 'utf8')
+  const target = path.join(blog, route)
+  if (fs.existsSync(target) && fs.readFileSync(target, 'utf8') !== source)
+    throw Error('Review existing integration file before replacing: ' + route)
+  fs.mkdirSync(path.dirname(target), { recursive: true })
+  fs.writeFileSync(target, source)
+}
+const draftPath = path.join(blog, 'app/draft/page.tsx')
+const draftSource = fs.readFileSync(
+  path.join(here, 'blog/app/draft/page.tsx'),
+  'utf8'
+)
+const previous = fs.readFileSync(draftPath, 'utf8')
+if (
+  previous !== draftSource &&
+  !previous.includes('const draftBlogs = getDraftBlogs(allBlogs)')
+)
+  throw Error('Review existing draft page before replacing it')
+fs.writeFileSync(draftPath, draftSource)
+console.log('Installed Notes integration')

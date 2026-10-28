@@ -1,42 +1,39 @@
 const $ = (id) => document.getElementById(id)
-const state = { id: null, entries: [] }
-const localTokenKey = 'blog-notes-local-token'
+const local = ['localhost', '127.0.0.1'].includes(location.hostname)
+const tokenKey = 'blog-notes-local-token'
 const draftKey = 'blog-notes-editor-unsaved'
-const localToken = sessionStorage.getItem(localTokenKey) || ''
-$('localToken').value = localToken
-$('localToken').closest('.auth-bar').hidden = ![
-  'localhost',
-  '127.0.0.1',
-].includes(location.hostname)
-
-function headers() {
-  const result = { 'Content-Type': 'application/json' }
-  const token = sessionStorage.getItem(localTokenKey)
-  if (token && ['localhost', '127.0.0.1'].includes(location.hostname))
-    result.Authorization = `Bearer ${token}`
-  return result
+const state = {
+  id: null,
+  authorized: false,
+  busy: false,
+  selection: 0,
+  preview: 0,
 }
-function notice(message, error = false) {
-  $('message').textContent = message
+let timer, previewRequest
+
+function notice(text, error = false) {
+  $('message').textContent = text
   $('message').classList.toggle('error', error)
 }
-async function api(url, method = 'GET', data) {
-  const response = await fetch(url, {
-    method,
-    credentials: 'same-origin',
-    headers: headers(),
-    ...(data === undefined ? {} : { body: JSON.stringify(data) }),
-  })
-  let result
-  try {
-    result = await response.json()
-  } catch {
-    throw new Error(`HTTP ${response.status}`)
-  }
-  if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`)
+function headers() {
+  const result = { 'Content-Type': 'application/json' }
+  const token = sessionStorage.getItem(tokenKey)
+  if (local && token) result.Authorization = `Bearer ${token}`
   return result
 }
-function getDraft() {
+async function api(path, method = 'GET', data, signal) {
+  const response = await fetch(path, {
+    method,
+    headers: headers(),
+    credentials: 'same-origin',
+    signal,
+    ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+  })
+  const value = await response.json()
+  if (!response.ok) throw new Error(value.error || `HTTP ${response.status}`)
+  return value
+}
+function values() {
   return {
     title: $('title').value.trim() || null,
     markdown: $('markdown').value,
@@ -46,7 +43,55 @@ function getDraft() {
     ),
   }
 }
-function loadDraft(data = {}) {
+function remember() {
+  sessionStorage.setItem(
+    draftKey,
+    JSON.stringify({ id: state.id, entry: values() })
+  )
+}
+function busy(value) {
+  state.busy = value
+  for (const id of [
+    'saveBtn',
+    'newNote',
+    'noteSelect',
+    'title',
+    'markdown',
+    'status',
+  ])
+    $(id).disabled = value
+  document.querySelectorAll('.tag-check').forEach((el) => (el.disabled = value))
+  $('deleteBtn').disabled = value || !state.id
+}
+async function preview() {
+  const version = ++state.preview
+  previewRequest?.abort()
+  $('previewTitle').textContent = $('title').value.trim() || '隨筆'
+  if (!state.authorized) {
+    $('preview').textContent = '登入後即可即時預覽。'
+    return
+  }
+  previewRequest = new AbortController()
+  try {
+    const result = await api(
+      '/notes/api/admin/preview',
+      'POST',
+      values(),
+      previewRequest.signal
+    )
+    if (version !== state.preview) return
+    $('previewTitle').textContent = result.title
+    $('preview').innerHTML = result.html // Server Markdown renderer disables raw HTML and unsafe links.
+  } catch (error) {
+    if (error.name !== 'AbortError' && version === state.preview)
+      notice(error.message, true)
+  }
+}
+function schedulePreview() {
+  clearTimeout(timer)
+  timer = setTimeout(preview, 180)
+}
+function load(data = {}) {
   $('title').value = data.title || ''
   $('markdown').value = data.markdown || ''
   $('status').value = data.status || 'draft'
@@ -54,123 +99,151 @@ function loadDraft(data = {}) {
     .querySelectorAll('.tag-check')
     .forEach((el) => (el.checked = (data.tags || []).includes(el.value)))
   $('deleteBtn').disabled = !state.id
-  $('preview').replaceChildren()
+  preview()
 }
-function rememberDraft() {
-  sessionStorage.setItem(
-    draftKey,
-    JSON.stringify({ id: state.id, entry: getDraft() })
-  )
+async function selectNote(id) {
+  const selection = ++state.selection
+  busy(true)
+  try {
+    const item = id ? await api(`/notes/api/admin/${id}/`) : {}
+    if (selection !== state.selection) return
+    state.id = id || null
+    $('noteSelect').value = id || ''
+    load(item)
+    remember()
+    notice(id ? '已載入' : '新草稿')
+  } catch (error) {
+    notice(error.message, true)
+  } finally {
+    if (selection === state.selection) busy(false)
+  }
 }
+async function refreshList() {
+  const result = await api('/notes/api/admin/')
+  for (let page = 2; page <= result.pages; page++)
+    result.items.push(...(await api(`/notes/api/admin/?page=${page}`)).items)
+  $('noteSelect').replaceChildren(new Option('新增隨筆', ''))
+  for (const item of result.items)
+    $('noteSelect').add(
+      new Option(
+        `${item.status === 'draft' ? '[草稿] ' : ''}${item.title || item.markdown.replace(/\s+/g, ' ').slice(0, 50)}`,
+        item.id
+      )
+    )
+  $('noteSelect').value = state.id || ''
+  state.authorized = true
+  $('authStatus').textContent = '已登入'
+  $('auth').hidden = true
+  $('toggleAuth').setAttribute('aria-expanded', 'false')
+}
+async function login() {
+  if (local) {
+    const token = $('localToken').value.trim()
+    if (token) sessionStorage.setItem(tokenKey, token)
+    else sessionStorage.removeItem(tokenKey)
+  }
+  try {
+    await refreshList()
+    await preview()
+    notice('已登入')
+  } catch (error) {
+    state.authorized = false
+    $('authStatus').textContent = '尚未登入'
+    notice(error.message, true)
+  }
+}
+$('toggleAuth').hidden = !local
+$('localToken').value = local ? sessionStorage.getItem(tokenKey) || '' : ''
+$('toggleAuth').addEventListener('click', () => {
+  $('auth').hidden = !$('auth').hidden
+  $('toggleAuth').setAttribute('aria-expanded', String(!$('auth').hidden))
+  if (!$('auth').hidden) $('localToken').focus()
+})
+$('saveToken').addEventListener('click', login)
+$('localToken').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') login()
+})
+$('noteSelect').addEventListener('change', (event) =>
+  selectNote(event.target.value)
+)
+$('newNote').addEventListener('click', () => selectNote(''))
 for (const id of ['title', 'markdown', 'status'])
-  $(id).addEventListener('input', rememberDraft)
+  $(id).addEventListener('input', () => {
+    remember()
+    schedulePreview()
+  })
 document
   .querySelectorAll('.tag-check')
-  .forEach((el) => el.addEventListener('change', rememberDraft))
-
-async function refreshList() {
-  try {
-    const response = await api('/notes/api/admin/')
-    for (let page = 2; page <= response.pages; page++) {
-      const next = await api(`/notes/api/admin/?page=${page}`)
-      response.items.push(...next.items)
-    }
-    state.entries = response.items
-    const sel = $('noteSelect')
-    sel.replaceChildren(new Option('新增隨筆', ''))
-    for (const item of response.items)
-      sel.add(
-        new Option(
-          `${item.status === 'draft' ? '[草稿] ' : ''}${item.title || item.markdown.replace(/\s+/g, ' ').slice(0, 32)} (${item.id})`,
-          item.id
-        )
-      )
-    if (state.id) sel.value = state.id
-    $('authStatus').textContent = '已驗證'
-  } catch (e) {
-    $('authStatus').textContent = '尚未登入或授權失效'
-    notice(e.message, true)
-  }
-}
-$('saveToken').addEventListener('click', () => {
-  const value = $('localToken').value.trim()
-  if (value) sessionStorage.setItem(localTokenKey, value)
-  else sessionStorage.removeItem(localTokenKey)
-  refreshList()
-})
-$('noteSelect').addEventListener('change', async (e) => {
-  state.id = e.target.value || null
-  if (!state.id) {
-    loadDraft()
-    rememberDraft()
-    return
-  }
-  try {
-    loadDraft(await api(`/notes/api/admin/${state.id}`))
-    rememberDraft()
-  } catch (err) {
-    notice(err.message, true)
-  }
-})
-$('newNote').addEventListener('click', () => {
-  state.id = null
-  $('noteSelect').value = ''
-  loadDraft()
-  rememberDraft()
-  notice('新草稿')
-})
-$('previewBtn').addEventListener('click', async () => {
-  try {
-    const { html } = await api('/notes/api/admin/preview', 'POST', {
-      markdown: $('markdown').value,
-    })
-    $('preview').innerHTML = html // Server renders HTML with Markdown raw HTML disabled.
-    notice('預覽已更新')
-  } catch (e) {
-    notice(e.message, true)
-  }
-})
+  .forEach((el) => el.addEventListener('change', remember))
 $('saveBtn').addEventListener('click', async () => {
+  if (state.busy) return
+  busy(true)
   try {
-    const input = getDraft()
-    const result = await api(
-      state.id ? `/notes/api/admin/${state.id}` : '/notes/api/admin/',
+    const item = await api(
+      state.id ? `/notes/api/admin/${state.id}/` : '/notes/api/admin/',
       state.id ? 'PUT' : 'POST',
-      input
+      values()
     )
-    state.id = result.id
-    $('deleteBtn').disabled = false
+    state.id = item.id
     sessionStorage.removeItem(draftKey)
+    history.replaceState(null, '', `?id=${encodeURIComponent(item.id)}`)
     await refreshList()
-    notice(
-      `已儲存${result.status === 'published' ? '並發布' : '草稿'}：${result.id}`
-    )
-  } catch (e) {
-    notice(e.message, true)
+    await preview()
+    notice(item.status === 'published' ? '已儲存並發布' : '已儲存草稿')
+  } catch (error) {
+    notice(error.message, true)
+  } finally {
+    busy(false)
   }
 })
 $('deleteBtn').addEventListener('click', async () => {
-  if (!state.id || !confirm('確定刪除此則隨筆？此操作無法復原。')) return
+  if (state.busy || !state.id || !confirm('確定刪除此則隨筆？')) return
+  busy(true)
   try {
-    await api(`/notes/api/admin/${state.id}`, 'DELETE')
+    await api(`/notes/api/admin/${state.id}/`, 'DELETE')
     state.id = null
-    loadDraft()
-    $('noteSelect').value = ''
+    load()
     sessionStorage.removeItem(draftKey)
+    history.replaceState(null, '', location.pathname)
     await refreshList()
     notice('已刪除')
-  } catch (e) {
-    notice(e.message, true)
+  } catch (error) {
+    notice(error.message, true)
+  } finally {
+    busy(false)
+  }
+})
+document.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+    event.preventDefault()
+    $('saveBtn').click()
   }
 })
 
-const prior = sessionStorage.getItem(draftKey)
-if (prior) {
-  try {
-    const draft = JSON.parse(prior)
-    state.id = draft.id
-    loadDraft(draft.entry)
-    notice('已回復此瀏覽器的未儲存草稿')
-  } catch {}
+const requestedId = new URLSearchParams(location.search).get('id')
+try {
+  const prior = JSON.parse(sessionStorage.getItem(draftKey) || 'null')
+  if (prior && (!requestedId || requestedId === prior.id)) {
+    state.id = prior.id
+    load(prior.entry)
+    notice('已回復未儲存草稿')
+  }
+} catch {
+  /* Ignore an invalid browser draft; stored notes are unaffected. */
 }
-refreshList()
+try {
+  await refreshList()
+  if (
+    requestedId &&
+    !(state.id === requestedId && sessionStorage.getItem(draftKey))
+  )
+    await selectNote(requestedId)
+  else await preview()
+} catch {
+  $('authStatus').textContent = '尚未登入'
+  if (local) {
+    $('auth').hidden = false
+    $('toggleAuth').setAttribute('aria-expanded', 'true')
+  }
+  preview()
+}
