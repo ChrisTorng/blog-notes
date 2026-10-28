@@ -1,0 +1,6 @@
+[
+  { "id": "future", "displayName": "未來趨勢" },
+  { "id": "ai", "displayName": "AI" },
+  { "id": "music", "displayName": "音樂" },
+  { "id": "english", "displayName": "English" }
+]

@@ -1,0 +1,9 @@
+# Copy to .dev.vars. Only for local Wrangler development; NEVER commit .dev.vars.
+AUTH_MODE=local
+LOCAL_ADMIN_TOKEN=REPLACE_WITH_A_LONG_RANDOM_VALUE
+# Configure when testing the combined timeline against a locally running Next.js blog:
+BLOG_FEED_URL=http://127.0.0.1:3000/feed.xml
+SITE_URL=https://christorng.idv.tw
+ALLOWED_DEV_ORIGIN=http://localhost:3000
+
+BLOG_INDEX_URL=http://127.0.0.1:3000/articles-index.json

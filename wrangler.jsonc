@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "blog-notes",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-27",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "blog-notes",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "vars": {
+    "SITE_URL": "https://christorng.idv.tw",
+    "BLOG_FEED_URL": "https://christorng.idv.tw/feed.xml",
+    "BLOG_INDEX_URL": "https://christorng.idv.tw/articles-index.json",
+  },
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+}
