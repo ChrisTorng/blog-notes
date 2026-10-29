@@ -3,32 +3,46 @@
   "name": "blog-notes",
   "main": "src/index.js",
   "compatibility_date": "2026-10-27",
-  "workers_dev": true,
+  "workers_dev": false,
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "run_worker_first": true,
-    "html_handling": "none"
+    "html_handling": "none",
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "blog-notes",
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "migrations"
-    }
+      "database_id": "54af1053-1f9c-4bba-901e-ab9a0cc8507a",
+      "migrations_dir": "migrations",
+      "preview_database_id": "00000000-0000-0000-0000-000000000000",
+    },
   ],
   "vars": {
     "SITE_URL": "https://christorng.idv.tw",
     "BLOG_FEED_URL": "https://christorng.idv.tw/feed.xml",
     "BLOG_INDEX_URL": "https://christorng.idv.tw/articles-index.json",
-    "BLOG_SHELL_URL": "https://christorng.idv.tw/notes-shell/"
+    "BLOG_SHELL_URL": "https://christorng.idv.tw/notes-shell/",
+    "AUTH_MODE": "access",
+    "ACCESS_TEAM_DOMAIN": "https://christorng.cloudflareaccess.com",
+    "ACCESS_AUD": "196e3a179698aabf9ff3c4005a131c59f2fdecdf0f41017cf49d303212ef261b",
   },
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1
-  }
+    "head_sampling_rate": 1,
+  },
+  "account_id": "9cc62792ee01a8163da2a1b0cc86a55b",
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "christorng.idv.tw/notes",
+      "zone_id": "c5475506538ba09563cacc12b8acb3d0",
+    },
+    {
+      "pattern": "christorng.idv.tw/notes/*",
+      "zone_id": "c5475506538ba09563cacc12b8acb3d0",
+    },
+  ],
 }

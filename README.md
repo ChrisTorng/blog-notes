@@ -81,7 +81,7 @@ Remove-Item Env:TEST_BASE_URL
 
 管理頁與 API 使用 Cloudflare Access，驗證 RS256 簽章、issuer、audience、期限及指定 Email；未設定時預設拒絕。本機 Token 僅限 localhost。
 
-正式部署前需要真實 D1 ID、Access 設定、發布主站共用版型及索引，並另行驗證 static export、Access 登入與 Kit RSS。此 repo 沒有自動部署；本機開發不修改正式 Route 或遠端資料庫。
+wrangler.jsonc 已綁定正式 D1 與主站 /notes、/notes/\* 兩條 Worker 路由；其他主站路徑維持原網站。管理頁與管理 API 共用一個 Access 應用。管理者 Email 以 Cloudflare secret ACCESS_ALLOWED_EMAIL 保存，不寫入 repo。此 repo 沒有自動部署；本機開發不修改正式 Route 或遠端資料庫。
 
 歷史清單按草稿／已發佈分組並顯示時間；新增由獨立按鈕處理。選取或儲存項目後網址包含該 ID。公開頁只有經 `/notes/api/session` 驗證的管理者才會看到編輯連結；連結本身不取代管理 API 的權限驗證。
 
@@ -106,3 +106,26 @@ Remove-Item Env:TEST_BASE_URL
 匯出端點為 GET /notes/api/admin/export，與其他管理 API 使用相同的登入驗證，回應不允許快取。匯出是備份，不會變更或刪除資料，也不會自動加入主站文章。
 
 隨筆列表、詳細頁、混合時間軸及 RSS 一律提供全文，不使用摘要截斷。內文上限 30,000 字元，選填標題上限 160 字元；前端輸入、預覽與寫入 API 均維持此限制。
+
+## 線上資源與部署
+
+- 公開隨筆：https://christorng.idv.tw/notes/
+- 管理介面：https://christorng.idv.tw/notes/editor/
+- D1 與 Worker 名稱：blog-notes；D1 主區域為 APAC。
+- Access 只保護 /notes/editor、/notes/editor/_、/notes/api/admin、/notes/api/admin/_，不保護整個主站或公開隨筆 API。僅指定管理者可用 Email 驗證碼登入。
+- Access JWT 的 issuer 與 audience 在 wrangler.jsonc；管理者 Email 只存在 Access policy 與 Worker secret。登入 cookie 使用 HttpOnly，並覆蓋同一 hostname，讓公開頁與草稿頁能辨識已登入管理者。
+- workers.dev 與 preview URLs 均關閉；以主站網址驗證。
+- preview_database_id 保留原本本機 SQLite 的識別值；正式部署綁定 database_id，兩者資料互不混用。
+
+後續部署：
+
+```powershell
+npx wrangler d1 migrations apply DB --remote
+# 首次或更換管理者時設定；不要將 Email 或 token 寫進版控。
+npx wrangler secret put ACCESS_ALLOWED_EMAIL
+npm run deploy
+```
+
+部署後確認公開列表、單篇、RSS、Sitemap，並確認草稿不會由公開網址或公開 API 取得；未登入時管理頁及管理 API 應轉至 Access 登入。以管理者登入後再驗證新增、儲存草稿、發佈與匯出。主站首頁、類別與導覽的隨筆露出開關目前維持關閉。
+
+若需暫停線上預覽，可在該網域的 Worker Routes 移除僅指向 blog-notes 的 /notes 與 /notes/\* 路由；此操作不刪除 D1 資料，也不影響主站其他網址。重新部署會恢復設定檔中的路由。
