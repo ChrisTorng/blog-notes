@@ -17,7 +17,10 @@
 * {
   box-sizing: border-box;
 }
+html,
 body {
+  width: 100%;
+  height: 100%;
   margin: 0;
 }
 button,
@@ -39,12 +42,12 @@ button {
   cursor: pointer;
   white-space: nowrap;
 }
-button:hover {
+button:hover:enabled {
   border-color: var(--accent);
 }
 button:disabled {
-  opacity: 0.5;
-  cursor: wait;
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 a {
   color: var(--accent);
@@ -57,28 +60,28 @@ textarea:focus {
   outline-offset: 1px;
 }
 .workspace {
+  width: 100%;
   height: 100dvh;
-  max-width: 1500px;
-  margin: auto;
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-  gap: 12px;
-  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
 }
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-height: 40px;
+  gap: 12px;
+  min-height: 38px;
+  flex: none;
 }
 .toolbar h1 {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   margin: 0;
   white-space: nowrap;
 }
 .toolbar small {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 400;
 }
 .toolbar > a {
@@ -87,16 +90,23 @@ textarea:focus {
 }
 .note-picker {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex: 1;
   justify-content: flex-end;
   min-width: 0;
 }
+.note-picker > label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .note-picker select {
-  width: min(30vw, 380px);
+  width: min(42vw, 600px);
   min-width: 100px;
 }
-#authStatus {
+#authStatus,
+#noteStatus {
   font-size: 0.8rem;
   color: var(--muted);
   white-space: nowrap;
@@ -108,6 +118,7 @@ textarea:focus {
   padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  flex: none;
 }
 .auth-bar[hidden] {
   display: none;
@@ -116,80 +127,88 @@ textarea:focus {
   flex: 1;
   min-width: 0;
 }
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.title-row label {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-.title-row input {
-  flex: 1;
-  min-width: 0;
-  font-weight: 650;
-}
 .split-view {
+  flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  gap: 12px;
 }
-.markdown-pane,
+.compose-pane,
 .preview-pane {
+  display: grid;
+  grid-template-rows: 36px 72px 24px minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 9px;
   background: var(--surface);
-}
-.markdown-pane {
-  display: grid;
-  grid-template-rows: auto 1fr;
   overflow: hidden;
 }
-.markdown-pane > label,
 .pane-label {
-  display: block;
-  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 600;
 }
-.markdown-pane textarea {
+.title-field {
+  min-width: 0;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  overflow: auto;
+}
+.title-field input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+.title-field h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.body-label {
+  padding: 0 16px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+}
+.compose-pane textarea {
+  min-height: 0;
+  min-width: 0;
   width: 100%;
   height: 100%;
   resize: none;
   border: 0;
   background: transparent;
-  padding: 16px;
-  line-height: 1.7;
+  padding: 12px 16px;
   font:
     1rem/1.7 ui-monospace,
     Consolas,
     monospace;
 }
-.preview-pane {
+.preview-pane .prose {
+  min-height: 0;
   overflow: auto;
-  padding: 0 20px 20px;
-}
-.pane-label {
-  margin: 0 -20px 20px;
-}
-.preview-pane h1 {
-  font-size: 1.5rem;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-.prose {
+  margin: 0;
+  padding: 0 16px 16px;
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
+.prose > :first-child {
+  margin-top: 10px;
+}
 .prose p {
-  margin: 12px 0;
+  margin: 10px 0;
 }
 .prose pre {
   overflow: auto;
@@ -223,7 +242,8 @@ textarea:focus {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px 12px;
+  flex: none;
 }
 .tag-select {
   margin: 0 auto 0 0;
@@ -248,7 +268,7 @@ textarea:focus {
 #message {
   flex-basis: 100%;
   margin: 0;
-  min-height: 1.4em;
+  min-height: 1.3em;
   font-size: 0.8rem;
   color: var(--muted);
 }
@@ -277,12 +297,15 @@ textarea:focus {
   }
 }
 @media (max-width: 640px) {
+  html,
+  body {
+    height: auto;
+  }
   .workspace {
     height: auto;
     min-height: 100dvh;
-    padding: 12px;
+    padding: 10px;
     gap: 10px;
-    grid-template-rows: auto auto auto auto auto;
   }
   .toolbar {
     flex-wrap: wrap;
@@ -292,6 +315,9 @@ textarea:focus {
     order: 2;
     flex-basis: 100%;
   }
+  .note-picker > label {
+    display: none;
+  }
   .note-picker select {
     flex: 1;
     width: auto;
@@ -300,12 +326,15 @@ textarea:focus {
     margin-left: auto;
   }
   .split-view {
+    flex: none;
     grid-template-columns: 1fr;
-    grid-template-rows: 300px minmax(250px, auto);
-    gap: 12px;
+    grid-template-rows: 50dvh 50dvh;
+    min-height: 560px;
+    gap: 10px;
   }
+  .compose-pane,
   .preview-pane {
-    max-height: 65dvh;
+    grid-template-rows: 34px 64px 24px minmax(0, 1fr);
   }
   .tag-select {
     flex-basis: 100%;
@@ -315,18 +344,24 @@ textarea:focus {
   }
 }
 
-.toolbar {
-  grid-row: 1;
+dialog {
+  max-width: min(92vw, 460px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 24px;
 }
-.auth-bar {
-  grid-row: 2;
+dialog::backdrop {
+  background: #0007;
 }
-.title-row {
-  grid-row: 3;
+dialog h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
 }
-.split-view {
-  grid-row: 4;
-}
-.action-bar {
-  grid-row: 5;
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
 }

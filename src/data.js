@@ -71,7 +71,7 @@ export async function listNotes(
   const result = await db
     .prepare(
       `SELECT ${fields} FROM notes n WHERE ${filter}
-    ORDER BY COALESCE(n.published_at, n.created_at) DESC, n.id DESC LIMIT ? OFFSET ?`
+    ORDER BY COALESCE(n.published_at, n.created_at) DESC, n.created_at DESC, n.id DESC LIMIT ? OFFSET ?`
     )
     .bind(...params, size, (safePage - 1) * size)
     .all()
@@ -157,4 +157,22 @@ export async function deleteNote(db, id) {
 export function pageNumber(input) {
   const value = Number(input)
   return Number.isSafeInteger(value) && value > 0 && value <= 100000 ? value : 1
+}
+
+export async function noteTagCounts(db) {
+  const rows = await db
+    .prepare(
+      "SELECT nt.tag_id, COUNT(*) AS count FROM note_tags nt JOIN notes n ON n.id=nt.note_id WHERE n.status='published' GROUP BY nt.tag_id"
+    )
+    .all()
+  return Object.fromEntries(rows.results.map((row) => [row.tag_id, row.count]))
+}
+export async function exportNoteBatch(db, afterId = '') {
+  const rows = await db
+    .prepare(
+      `SELECT ${fields} FROM notes n WHERE n.id > ? ORDER BY n.id LIMIT 100`
+    )
+    .bind(afterId)
+    .all()
+  return rows.results.map(decode)
 }

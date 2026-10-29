@@ -25,3 +25,16 @@ test('page number bounds', () => {
   assert.equal(pageNumber('Infinity'), 1)
   assert.equal(pageNumber('abc'), 1)
 })
+
+test('content and title limits accept their exact boundary and reject longer input', () => {
+  const valid = checkNoteInput({
+    markdown: '文'.repeat(30000),
+    title: '題'.repeat(160),
+  })
+  assert.equal(valid.markdown.length, 30000)
+  assert.equal(valid.title.length, 160)
+  assert.throws(() => checkNoteInput({ markdown: '文'.repeat(30001) }))
+  assert.throws(() =>
+    checkNoteInput({ markdown: '文', title: '題'.repeat(161) })
+  )
+})

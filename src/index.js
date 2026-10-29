@@ -1,5 +1,7 @@
+import { notesExport } from './export.js'
 import {
   allTags,
+  noteTagCounts,
   createNote,
   deleteNote,
   getNote,
@@ -82,6 +84,8 @@ async function handleAdmin(req, env, url, path) {
   const identity = await adminIdentity(req, env)
   if (!identity) return unauthorized()
   if (!allowedOrigin(req, env)) return json({ error: '不允許跨來源修改' }, 403)
+  if (path === '/notes/api/admin/export' && req.method === 'GET')
+    return notesExport(env.DB)
   if (path === '/notes/api/admin/whoami' && req.method === 'GET')
     return json(identity)
   if (path === '/notes/api/admin/preview' && req.method === 'POST') {
@@ -165,7 +169,15 @@ async function combinedPage(env, page, tag = '', api = false) {
   if (api)
     return {
       items: items.map((x) =>
-        x.kind === 'note' ? { kind: 'note', ...x.note } : { ...x }
+        x.kind === 'note'
+          ? {
+              kind: 'note',
+              ...x.note,
+              date: x.date,
+              displayTitle: noteTitle(x.note),
+              html: renderMarkdown(x.note.markdown),
+            }
+          : { ...x }
       ),
       page,
       pages,
@@ -207,6 +219,20 @@ const backend = {
         })
       if (path.startsWith('/notes/api/admin/') || path === '/notes/api/admin')
         return await handleAdmin(req, env, url, path)
+      if (/^\/notes\/api\/session\/?$/.test(path) && req.method === 'GET')
+        return json({ admin: Boolean(await adminIdentity(req, env)) })
+      if (path === '/notes/api/categories' && req.method === 'GET') {
+        const result = await env.DB.prepare(
+          "SELECT nt.tag_id, COUNT(*) AS count FROM note_tags nt JOIN notes n ON n.id=nt.note_id WHERE n.status='published' GROUP BY nt.tag_id"
+        ).all()
+        return json(
+          allTags.map((tag) => ({
+            ...tag,
+            noteCount:
+              result.results.find((row) => row.tag_id === tag.id)?.count || 0,
+          }))
+        )
+      }
       if (path === '/notes/api/tags' && req.method === 'GET')
         return json(allTags)
       if (
@@ -224,7 +250,7 @@ const backend = {
           await combinedPage(
             env,
             pageNumber(url.searchParams.get('page')),
-            '',
+            url.searchParams.get('tag') || '',
             true
           )
         )
@@ -246,22 +272,32 @@ const backend = {
         return html(
           listingPage(data.items, {
             ...data,
+            tagCounts: await noteTagCounts(env.DB),
             tag: url.searchParams.get('tag') || '',
             siteUrl: siteUrl(env),
           })
         )
       }
-      if (allMatch && req.method === 'GET') {
-        const body = await combinedPage(env, pageNumber(allMatch[2]))
-        return body ? html(body) : notFound()
-      }
+      if (allMatch && req.method === 'GET')
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location:
+              pageNumber(allMatch[2]) === 1
+                ? '/'
+                : '/?page=' + pageNumber(allMatch[2]),
+            'Cache-Control': 'no-store',
+          },
+        })
       if (path === '/notes/feed.xml' && req.method === 'GET') {
-        const data = await listNotes(env.DB, { pageSize: 100 })
-        return xml(rssXml(data.items, siteUrl(env)), 'application/rss+xml')
+        const tag = url.searchParams.get('tag') || ''
+        const data = await listNotes(env.DB, { pageSize: 100, tag })
+        return xml(rssXml(data.items, siteUrl(env), tag), 'application/rss+xml')
       }
       if (path === '/notes/all/feed.xml' && req.method === 'GET') {
+        const tag = url.searchParams.get('tag') || ''
         const [notes, blogs] = await Promise.all([
-          listNotes(env.DB, { pageSize: 100 }),
+          listNotes(env.DB, { pageSize: 100, tag }),
           readBlogItems(env),
         ])
         if (blogs.error && !blogs.items.length)
@@ -274,7 +310,7 @@ const backend = {
             },
           })
         return xml(
-          allRssXml(notes.items, blogs.items, siteUrl(env)),
+          allRssXml(notes.items, blogs.items, siteUrl(env), tag),
           'application/rss+xml'
         )
       }
@@ -303,7 +339,27 @@ const backend = {
           !(await adminIdentity(req, env))
         )
           return unauthorized()
-        return html(editorPage(siteUrl(env)), 200, 'private, no-store')
+        const response = html(
+          editorPage(siteUrl(env)),
+          200,
+          'private, no-store'
+        )
+        // Retire a cached redirect from the first local prototype. Never clear cookies or storage.
+        if (
+          env.AUTH_MODE === 'local' &&
+          ['localhost', '127.0.0.1'].includes(url.hostname) &&
+          !req.headers
+            .get('cookie')
+            ?.split(';')
+            .some((value) => value.trim() === 'notes_dev_cache=3')
+        ) {
+          response.headers.set('Clear-Site-Data', '"cache"')
+          response.headers.append(
+            'Set-Cookie',
+            'notes_dev_cache=3; Path=/notes; SameSite=Lax; HttpOnly'
+          )
+        }
+        return response
       }
       const itemMatch = path.match(/^\/notes\/([0-9]{8}-[a-f0-9]{10})\/?$/)
       if (itemMatch && req.method === 'GET') {

@@ -41,8 +41,7 @@ export default function DraftTimeline({ articles }: { articles: Entry[] }) {
           credentials: 'same-origin',
           signal: controller.signal,
         })
-        if (!response.ok)
-          throw new Error('請先登入隨筆編輯器，再重新開啟草稿列表。')
+        if (!response.ok) throw new Error('請先登入隨筆編輯器，再重新開啟草稿列表。')
         const result = await response.json()
         pages = result.pages
         items.push(...result.items)
@@ -55,9 +54,7 @@ export default function DraftTimeline({ articles }: { articles: Entry[] }) {
             id: note.id,
             kind: 'note',
             title:
-              note.title ||
-              note.markdown.split('\n').find((line) => line.trim()) ||
-              '未命名隨筆',
+              note.title || note.markdown.split('\n').find((line) => line.trim()) || '未命名隨筆',
             date: note.updated_at || note.created_at,
             summary: note.markdown,
             url: `/notes/editor/?id=${encodeURIComponent(note.id)}`,
@@ -74,9 +71,7 @@ export default function DraftTimeline({ articles }: { articles: Entry[] }) {
     () =>
       [...articles, ...notes]
         .filter((entry) =>
-          `${entry.title} ${entry.summary}`
-            .toLowerCase()
-            .includes(query.toLowerCase())
+          `${entry.title} ${entry.summary}`.toLowerCase().includes(query.toLowerCase())
         )
         .sort((a, b) => b.date.localeCompare(a.date)),
     [articles, notes, query]
@@ -87,9 +82,7 @@ export default function DraftTimeline({ articles }: { articles: Entry[] }) {
         <h1 className="heading-accent text-3xl font-extrabold tracking-tight sm:text-4xl md:text-6xl">
           草稿
         </h1>
-        <p className="text-gray-500 dark:text-gray-400">
-          文章與隨筆草稿，依更新時間排列。
-        </p>
+        <p className="text-gray-500 dark:text-gray-400">文章與隨筆草稿，依更新時間排列。</p>
         <label className="block max-w-lg">
           <span className="sr-only">搜尋草稿</span>
           <input
@@ -110,12 +103,8 @@ export default function DraftTimeline({ articles }: { articles: Entry[] }) {
         {entries.map((entry) => (
           <li key={`${entry.kind}:${entry.id}`} className="py-8">
             <div className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-              <time dateTime={entry.date}>
-                {formatDate(entry.date, siteMetadata.locale)}
-              </time>
-              <span className="ml-3">
-                {entry.kind === 'note' ? '隨筆草稿' : '文章草稿'}
-              </span>
+              <time dateTime={entry.date}>{formatDate(entry.date, siteMetadata.locale)}</time>
+              <span className="ml-3">{entry.kind === 'note' ? '隨筆草稿' : '文章草稿'}</span>
             </div>
             <h2 className="text-2xl font-bold">
               <Link href={entry.url} className="title-link">

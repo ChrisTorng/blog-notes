@@ -15,9 +15,7 @@ export async function GET() {
     summary: post.summary || '',
     tags: post.tags.map(
       (tag) =>
-        tagDefinitions.find(
-          (entry) => entry.displayName === tag || entry.id === tag
-        )?.id || tag
+        tagDefinitions.find((entry) => entry.displayName === tag || entry.id === tag)?.id || tag
     ),
     date: new Date(post.date).toISOString(),
   }))

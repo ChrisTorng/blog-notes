@@ -1,3 +1,4 @@
+import { allTags } from './data.js'
 import { readLimitedText } from './http.js'
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import {
@@ -44,22 +45,25 @@ function articleRssItem(item) {
 function wrapRss(items, siteUrl, title, link) {
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>${htmlEscape(title)}</title><link>${htmlEscape(`${siteUrl}${link}`)}</link><description>${htmlEscape(title)}</description><language>zh-TW</language>${items.join('')}</channel></rss>`
 }
-export function rssXml(notes, siteUrl) {
+export function rssXml(notes, siteUrl, tag = '') {
   return wrapRss(
     notes.map((n) => noteRssItem(n, siteUrl)),
     siteUrl,
-    'ChrisTorng 學習天地 — 隨筆',
-    '/notes/'
+    'ChrisTorng 學習天地 — 隨筆' +
+      (tag
+        ? ' · ' + (allTags.find((t) => t.id === tag)?.displayName || tag)
+        : ''),
+    '/notes/' + (tag ? '?tag=' + encodeURIComponent(tag) : '')
   )
 }
-export function allRssXml(notes, blogItems, siteUrl) {
+export function allRssXml(notes, blogItems, siteUrl, tag = '') {
   const items = [
     ...notes.map((note) => ({
       kind: 'note',
       date: note.published_at || note.created_at,
       note,
     })),
-    ...blogItems,
+    ...blogItems.filter((item) => !tag || item.tags.includes(tag)),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 100)
@@ -71,8 +75,11 @@ export function allRssXml(notes, blogItems, siteUrl) {
   return wrapRss(
     items,
     siteUrl,
-    'ChrisTorng 學習天地 — 全部更新',
-    '/notes/all/'
+    'ChrisTorng 學習天地 — ' +
+      (tag
+        ? allTags.find((t) => t.id === tag)?.displayName || tag
+        : '全部更新'),
+    tag ? '/tags/' + encodeURIComponent(tag) + '/' : '/'
   )
 }
 export function sitemapXml(notes, siteUrl) {

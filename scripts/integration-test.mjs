@@ -43,6 +43,20 @@ async function call(
 const admin = '/notes/api/admin/'
 const xmlParser = new XMLParser({ ignoreAttributes: false })
 try {
+  const anonymous = await (await call('/notes/api/session')).json()
+  const session = await call('/notes/api/session', { auth: true })
+  const forged = await (
+    await call('/notes/api/session', {
+      headers: { Cookie: 'CF_Authorization=forged' },
+    })
+  ).json()
+  verify(
+    !anonymous.admin &&
+      !forged.admin &&
+      (await session.json()).admin &&
+      session.headers.get('Cache-Control') === 'no-store',
+    'session check is private, authenticated and not cacheable'
+  )
   await call(admin, { status: 401 })
   await call(admin, {
     headers: { 'Cf-Access-Authenticated-User-Email': 'spoof@example.org' },
@@ -103,6 +117,10 @@ try {
     'public page uses the main site shell'
   )
   const rendered = await themed.text()
+  verify(
+    /<svg\b[^>]*>[\s\S]*?<title>/.test(rendered),
+    'shared site SVG accessibility titles survive rewriting'
+  )
   const jsonld = rendered.match(
     /<script type="application\/ld\+json">(.*?)<\/script>/s
   )?.[1]
@@ -245,12 +263,25 @@ try {
     seen.size === combined.total && blogSeen && noteSeen,
     'all mixed timeline pages contain both real articles and notes without gaps or duplicates'
   )
-  await call('/notes/all/page/100000/', { status: 404 })
+  const legacy = await fetch(base + '/notes/all/', { redirect: 'manual' })
+  verify(
+    legacy.status === 302 && legacy.headers.get('Location') === '/',
+    'legacy All URL redirects to the homepage'
+  )
   await call('/notes/page/100000/', { status: 404 })
   await call('/notes/')
   await call('/notes')
   await call('/notes/?tag=ai')
-  await call('/notes/all/')
+  const music = await (await call('/notes/api/all?tag=music')).json()
+  verify(
+    music.items.every((item) => item.tags.includes('music')),
+    'categories merge only matching articles and notes'
+  )
+  const categories = await (await call('/notes/api/categories')).json()
+  verify(
+    categories.find((tag) => tag.id === 'music').noteCount === filtered.total,
+    'category counts include published notes only'
+  )
   verify(true, 'mixed SSR and out-of-range page responses')
   await call(admin + note.id, {
     method: 'PUT',

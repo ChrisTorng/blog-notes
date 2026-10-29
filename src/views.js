@@ -1,3 +1,8 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import ListWithCategories, {
+  formatNoteDate,
+} from '../shared/list-with-categories.js'
 import MarkdownIt from 'markdown-it'
 import { allTags } from './data.js'
 
@@ -84,13 +89,14 @@ export function tagLinks(note) {
     )
     .join(' ')
 }
-export function noteCard(note, { full = true } = {}) {
+export function noteCard(note, { showTitle = true } = {}) {
   const link = notePath(note.id)
   const date = note.published_at || note.created_at
-  return `<article class="entry note"><div class="entry-meta"><time datetime="${htmlEscape(date)}">${htmlEscape(new Date(date).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }))}</time> <span class="type">隨筆</span></div>
-${note.title ? `<h2><a href="${link}">${htmlEscape(note.title)}</a></h2>` : ''}
-<div class="prose dark:prose-invert">${full ? renderMarkdown(note.markdown) : `<p>${htmlEscape(plainText(note.markdown).slice(0, 320))}</p>`}</div>
-<div class="entry-foot"><span>${tagLinks(note)}</span><a class="permalink" href="${link}">永久連結</a></div></article>`
+  return `<article class="entry note" data-note-id="${htmlEscape(note.id)}"><div class="entry-meta"><time datetime="${htmlEscape(date)}">${htmlEscape(formatNoteDate(date))}</time></div>
+${showTitle && note.title ? `<h2><a class="title-link" href="${link}">${htmlEscape(note.title)}</a></h2>` : ''}
+<div class="entry-tags">${tagLinks(note)}</div>
+<div class="prose dark:prose-invert">${renderMarkdown(note.markdown)}</div>
+</article>`
 }
 export function articleCard(item) {
   return `<article class="entry article"><div class="entry-meta"><time datetime="${htmlEscape(item.date)}">${htmlEscape(new Date(item.date).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }))}</time> <span class="type">文章</span></div><h2><a href="${htmlEscape(item.url)}">${htmlEscape(item.title)}</a></h2><p class="summary">${htmlEscape(item.summary).slice(0, 550)}</p><a href="${htmlEscape(item.url)}">閱讀文章</a></article>`
@@ -101,15 +107,55 @@ export function pager(base, page, pages, tag = '') {
   return `<nav class="pager" aria-label="分頁">${page > 1 ? `<a href="${href(page - 1)}">← 上一頁</a>` : '<span></span>'}<span>第 ${page} / ${pages} 頁</span>${page < pages ? `<a href="${href(page + 1)}">下一頁 →</a>` : '<span></span>'}</nav>`
 }
 export function listingPage(notes, opts) {
-  const { page, pages, tag = '', siteUrl } = opts
-  const filtered = tag ? ` · ${names.get(tag) || tag}` : ''
+  const { page, pages, tag = '', siteUrl, tagCounts = {} } = opts
+  const filtered = tag ? ' · ' + (names.get(tag) || tag) : ''
+  const categories = allTags.map((t) => ({
+    ...t,
+    count: tagCounts[t.id] || 0,
+    href: '/notes/?tag=' + encodeURIComponent(t.id),
+  }))
+  const feedPath =
+    '/notes/feed.xml' + (tag ? '?tag=' + encodeURIComponent(tag) : '')
+  const body = renderToStaticMarkup(
+    createElement(ListWithCategories, {
+      posts: notes.map((note) => ({
+        path: note.id,
+        href: notePath(note.id),
+        date: note.published_at || note.created_at,
+        title: noteTitle(note),
+        html: renderMarkdown(note.markdown),
+        tags: note.tags.map((t) => names.get(t) || t),
+        noteId: note.id,
+      })),
+      title: '隨筆' + filtered,
+      categories,
+      activeTag: tag,
+      rootHref: '/notes/',
+      rootLabel: '所有隨筆',
+      rootActive: !tag,
+      rssHref: feedPath,
+      rssTitle: '隨筆' + filtered + ' RSS',
+      pagination: {
+        totalPages: pages,
+        currentPage: page,
+        basePath: 'notes',
+        hrefForPage: (n) =>
+          '/notes/' +
+          (n === 1 ? '' : 'page/' + n + '/') +
+          (tag ? '?tag=' + encodeURIComponent(tag) : ''),
+      },
+    })
+  )
   return pageHtml({
-    title: `隨筆${filtered}`,
+    title: '隨筆' + filtered,
     description: 'ChrisTorng 的近期隨筆、技術觀察與學習心得',
-    canonical: `/notes/${page === 1 ? '' : `page/${page}/`}${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`,
+    canonical:
+      '/notes/' +
+      (page === 1 ? '' : 'page/' + page + '/') +
+      (tag ? '?tag=' + encodeURIComponent(tag) : ''),
     current: 'notes',
     siteUrl,
-    body: `<div class="page-heading"><h1>隨筆 <small>Notes</small></h1><p>學習、觀察與思考的短篇記錄。</p><div class="filters"><a href="/notes/" ${!tag ? 'aria-current="page"' : ''}>全部主題</a>${allTags.map((t) => `<a href="/notes/?tag=${t.id}" ${tag === t.id ? 'aria-current="page"' : ''}>${htmlEscape(t.displayName)}</a>`).join('')}</div></div><div class="entries">${notes.length ? notes.map((n) => noteCard(n)).join('') : '<p>目前沒有隨筆。</p>'}</div>${pager('/notes/', page, pages, tag)}`,
+    body,
   })
 }
 export function individualPage(note, siteUrl) {
@@ -134,16 +180,16 @@ export function individualPage(note, siteUrl) {
     type: 'article',
     current: 'notes',
     head: `<script type="application/ld+json">${jsonld}</script>`,
-    body: `<p class="back"><a href="/notes/">← 隨筆列表</a></p><h1 class="note-heading">${htmlEscape(title)}</h1>${noteCard(note)}`,
+    body: `<p class="back"><a href="/notes/">← 隨筆列表</a></p><h1 class="note-heading">${htmlEscape(title)}</h1>${noteCard(note, { showTitle: false })}`,
   })
 }
 export function editorPage() {
   return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>編輯隨筆</title><link rel="stylesheet" href="/notes/editor.css"></head><body>
-<main class="workspace">
-<header class="toolbar"><h1>隨筆 <small>Notes</small></h1><a href="/notes/">瀏覽隨筆 ↗</a><div class="note-picker"><label class="sr-only" for="noteSelect">選擇已存在的隨筆</label><select id="noteSelect"><option value="">新增隨筆</option></select><button id="newNote" type="button">新增</button></div><span id="authStatus" role="status"></span><button id="toggleAuth" type="button" aria-controls="auth" aria-expanded="false">本機登入</button></header>
+<main class="workspace" id="workspace" aria-busy="false">
+<header class="toolbar"><h1>隨筆 <small>Notes</small></h1><a href="/notes/">瀏覽隨筆 ↗</a><div class="note-picker"><label for="noteSelect">歷史隨筆</label><select id="noteSelect" aria-label="選擇已存在的隨筆"></select><button id="newNote" type="button">新增</button></div><button id="exportNotes" type="button" disabled title="下載所有已儲存的隨筆，包含草稿，每則一個 Markdown 檔">匯出全部 .md</button><span id="authStatus" role="status"></span><button id="toggleAuth" type="button" aria-controls="auth" aria-expanded="false">本機登入</button></header>
 <section id="auth" class="auth-bar" hidden><label for="localToken">本機開發 Token</label><input id="localToken" type="password" autocomplete="off"><button id="saveToken" type="button">登入</button></section>
-<div class="title-row"><label for="title">標題</label><input id="title" maxlength="160" placeholder="選填；留白時取內文第一行"></div>
-<div class="split-view"><section class="markdown-pane"><label for="markdown">Markdown</label><textarea id="markdown" spellcheck="false" maxlength="30000" placeholder="寫下一點想法……"></textarea></section><section class="preview-pane" aria-label="即時預覽"><div class="pane-label">即時預覽</div><h1 id="previewTitle"></h1><div id="preview" class="prose dark:prose-invert"></div></section></div>
-<footer class="action-bar"><fieldset class="tag-select"><legend class="sr-only">主題標籤</legend>${allTags.map((t) => `<label><input type="checkbox" class="tag-check" value="${t.id}"> ${htmlEscape(t.displayName)}</label>`).join('')}</fieldset><label class="sr-only" for="status">發布狀態</label><select id="status"><option value="draft">草稿</option><option value="published">公開發布</option></select><button id="saveBtn" class="primary" type="button">儲存</button><button id="deleteBtn" class="danger" type="button" disabled>刪除</button><p id="message" role="status" aria-live="polite"></p></footer>
-</main><script type="module" src="/notes/editor.js"></script></body></html>`
+<div class="split-view"><section class="compose-pane" aria-label="編輯"><div class="pane-label">編輯</div><div class="title-field"><label class="sr-only" for="title">標題</label><input id="title" maxlength="160" placeholder="標題（選填；留白時取內文第一行）"></div><label class="body-label" for="markdown">內文（Markdown）</label><textarea id="markdown" spellcheck="false" maxlength="30000" placeholder="寫下一點想法……"></textarea></section>
+<section class="preview-pane" aria-label="即時預覽"><div class="pane-label">即時預覽</div><div class="title-field"><h1 id="previewTitle"></h1></div><div class="body-label" aria-hidden="true">內文</div><div id="preview" class="prose"></div></section></div>
+<footer class="action-bar"><fieldset class="tag-select"><legend class="sr-only">主題標籤</legend>${allTags.map((t) => `<label><input type="checkbox" class="tag-check" value="${t.id}"> ${htmlEscape(t.displayName)}</label>`).join('')}</fieldset><span id="noteStatus">新增</span><button id="saveDraftBtn" type="button">儲存為草稿</button><button id="publishBtn" class="primary" type="button">立即發佈</button><button id="deleteBtn" class="danger" type="button" disabled>刪除</button><p id="message" role="status" aria-live="polite"></p></footer>
+</main><dialog id="unsavedDialog" aria-labelledby="unsavedHeading" aria-describedby="unsavedAction"><form method="dialog"><h2 id="unsavedHeading">尚未儲存</h2><p id="unsavedAction"></p><div class="dialog-actions"><button value="cancel" autofocus>繼續編輯</button><button value="discard" class="danger">放棄並繼續</button></div></form></dialog><script type="module" src="/notes/editor.js"></script></body></html>`
 }

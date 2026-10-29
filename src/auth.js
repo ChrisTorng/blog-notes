@@ -25,7 +25,7 @@ export async function adminIdentity(request, env) {
   }
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD || !env.ACCESS_ALLOWED_EMAIL)
     return null
-  const token = request.headers.get('Cf-Access-Jwt-Assertion')
+  const token = accessToken(request)
   if (!token) return null
   try {
     const issuer = env.ACCESS_TEAM_DOMAIN.replace(/\/$/, '')
@@ -68,4 +68,21 @@ export async function verifyAccessToken(token, key, issuer, audience, email) {
   )
     return null
   return { email: payload.email, mode: 'access' }
+}
+
+// Access cookies are still cryptographically verified by adminIdentity; presence alone grants nothing.
+export function accessToken(request) {
+  const assertion = request.headers.get('Cf-Access-Jwt-Assertion')
+  if (assertion) return assertion
+  const cookie = request.headers
+    .get('Cookie')
+    ?.split(';')
+    .map((value) => value.trim())
+    .find((value) => value.startsWith('CF_Authorization='))
+  if (!cookie) return null
+  try {
+    return decodeURIComponent(cookie.slice('CF_Authorization='.length))
+  } catch {
+    return null
+  }
 }

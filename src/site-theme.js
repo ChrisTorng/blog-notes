@@ -41,7 +41,7 @@ export async function withSiteTheme(response, env) {
       'meta[name^="twitter:"]',
       'link[rel="canonical"]',
     ])
-      rewriter = rewriter.on(selector, {
+      rewriter = rewriter.on('head ' + selector, {
         element(el) {
           el.remove()
         },

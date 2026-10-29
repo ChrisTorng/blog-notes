@@ -70,3 +70,43 @@ test('Access validates signature, issuer, audience, expiry and exact allowed ema
     null
   )
 })
+
+test('signed Access token can be read from assertion or cookie without trusting cookie presence', async () => {
+  const { accessToken } = await import('../src/auth.js')
+  assert.equal(
+    accessToken(
+      new Request('https://example.org', {
+        headers: { Cookie: 'other=x; CF_Authorization=a.b.c' },
+      })
+    ),
+    'a.b.c'
+  )
+  assert.equal(
+    accessToken(
+      new Request('https://example.org', {
+        headers: {
+          Cookie: 'CF_Authorization=wrong',
+          'Cf-Access-Jwt-Assertion': 'header-token',
+        },
+      })
+    ),
+    'header-token'
+  )
+  assert.equal(
+    accessToken(
+      new Request('https://example.org', {
+        headers: { Cookie: 'CF_Authorization=%zz' },
+      })
+    ),
+    null
+  )
+  assert.equal(
+    await adminIdentity(
+      new Request('https://example.org', {
+        headers: { Cookie: 'CF_Authorization=forged' },
+      }),
+      {}
+    ),
+    null
+  )
+})
