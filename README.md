@@ -87,9 +87,9 @@ wrangler.jsonc 已綁定正式 D1 與主站 /notes、/notes/\* 兩條 Worker 路
 
 首頁與類別頁合併文章與已發佈隨筆。已發佈項目顯示「更新發佈」及「退回草稿」；退回草稿需確認，確認後會自公開頁、RSS、Sitemap 移除。舊的 `/notes/all/` 瀏覽網址轉向首頁，混合 RSS 路徑維持相容。
 
-## 上線前預備階段
+## 正式網站隨筆入口
 
-主站的 data/notesSettings.ts 以單一開關控制正式露出，目前 productionNotesDiscoveryEnabled 為 false。本機開發仍顯示隨筆；正式首頁與類別使用原文章版型且不呼叫隨筆 API，導覽不顯示隨筆。草稿頁、共用版型與已知隨筆網址獨立保留。只有在線上路由、資料庫、驗證與 SEO 測通之後，才另行修改開關公開。這是露出控制，不是存取限制。
+主站的 data/notesSettings.ts 以單一開關控制正式露出。線上測試確認後，productionNotesDiscoveryEnabled 已設為 true：首頁與類別合併文章及隨筆，導覽顯示隨筆，robots.txt 列入隨筆 sitemap。正式導覽仍不顯示草稿連結，草稿頁與管理功能維持既有驗證。若需暫時收起公開入口，可將開關改為 false 後重新發佈主站；這是露出控制，不是存取限制。
 
 ## 隨筆列表與分頁
 
@@ -126,6 +126,6 @@ npx wrangler secret put ACCESS_ALLOWED_EMAIL
 npm run deploy
 ```
 
-部署後確認公開列表、單篇、RSS、Sitemap，並確認草稿不會由公開網址或公開 API 取得；未登入時管理頁及管理 API 應轉至 Access 登入。以管理者登入後再驗證新增、儲存草稿、發佈與匯出。主站首頁、類別與導覽的隨筆露出開關目前維持關閉。
+部署後確認公開列表、單篇、RSS、Sitemap，並確認草稿不會由公開網址或公開 API 取得；未登入時管理頁及管理 API 應轉至 Access 登入。以管理者登入後再驗證新增、儲存草稿、發佈與匯出。主站首頁、類別與導覽的隨筆露出開關已開啟。
 
 若需暫停線上預覽，可在該網域的 Worker Routes 移除僅指向 blog-notes 的 /notes 與 /notes/\* 路由；此操作不刪除 D1 資料，也不影響主站其他網址。重新部署會恢復設定檔中的路由。

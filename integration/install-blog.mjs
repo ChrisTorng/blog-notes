@@ -97,6 +97,16 @@ for (const file of [
     throw Error('Review existing page before replacing: ' + file)
   fs.writeFileSync(target, source)
 }
+for (const file of ['app/robots.ts', 'app/sitemap.ts']) {
+  const source = fs.readFileSync(path.join(here, 'blog', file), 'utf8')
+  const target = path.join(blog, file)
+  const previous = fs.readFileSync(target, 'utf8')
+  const originalFunction = file.includes('robots') ? 'function robots()' : 'function sitemap()'
+  if (previous !== source && (!previous.includes(originalFunction) || previous.includes('notesDiscoveryEnabled')))
+    throw Error('Review existing SEO route before replacing: ' + file)
+  fs.writeFileSync(target, source)
+}
+
 let header = fs.readFileSync(path.join(blog, 'components/Header.tsx'), 'utf8')
 header = header
   .replace(

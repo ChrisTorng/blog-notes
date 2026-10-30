@@ -200,7 +200,7 @@ export default function PublicTimeline({
                         ? formatNoteDate(entry.date)
                         : formatDate(entry.date, siteMetadata.locale)}
                     </time>
-                    <span className="ml-2 text-sm">{entry.kind === 'note' ? '隨筆' : '文章'}</span>
+                    {entry.kind === 'blog' ? <span className="ml-2 text-sm">文章</span> : null}
                   </div>
                   <div className="responsive-date-content space-y-5">
                     <div>
@@ -233,7 +233,7 @@ export default function PublicTimeline({
                     )}
                     {entry.kind === 'blog' || admin ? (
                       <div className="flex gap-5 text-sm">
-                        <Link href={url}>{entry.kind === 'note' ? '永久連結' : '進入閱讀 →'}</Link>
+                        {entry.kind === 'blog' ? <Link href={url}>進入閱讀 →</Link> : null}
                         {entry.kind === 'note' && admin ? (
                           <Link href={`/notes/editor/?id=${entry.id}`} aria-label="編輯這則隨筆">
                             編輯

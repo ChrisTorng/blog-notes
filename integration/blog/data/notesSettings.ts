@@ -1,5 +1,5 @@
-// Keep public discovery off in production until the online Notes rollout is verified.
+// The online Notes rollout is verified; include Notes in public navigation and listings.
 // Direct Notes URLs and the authenticated draft view remain available independently.
-export const productionNotesDiscoveryEnabled = false
+export const productionNotesDiscoveryEnabled = true
 export const notesDiscoveryEnabled =
   process.env.NODE_ENV !== 'production' || productionNotesDiscoveryEnabled

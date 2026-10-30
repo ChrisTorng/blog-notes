@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
+const expectedProductionDiscovery = !process.argv.includes('--hidden')
 const blog = path.resolve(process.argv[2] || '../christorng.github.io')
 const require = createRequire(path.join(blog, 'package.json'))
 const { build } = require('esbuild')
@@ -41,6 +42,8 @@ import TagPagination from './app/tags/[tag]/page/[page]/page'
 import DraftPage from './app/draft/page'
 import NotesShell from './app/notes-shell/page'
 import navigation from './data/headerNavLinks'
+import robots from './app/robots'
+import sitemap from './app/sitemap'
 import {notesDiscoveryEnabled,productionNotesDiscoveryEnabled} from './data/notesSettings'
 import ArticlesHome from '@/components/notes/ArticlesHome'
 import ArticleCategories from '@/components/notes/ArticleCategories'
@@ -50,18 +53,22 @@ import ListLayout from '@/layouts/ListLayoutWithTags'
 import DraftTimeline from '@/components/notes/DraftTimeline'
 import NotesSlot from '@/components/notes/NotesSlot'
 const production=${JSON.stringify(mode)}==='production'
-assert.equal(productionNotesDiscoveryEnabled,false)
-assert.equal(notesDiscoveryEnabled,!production)
-assert.equal(Main({posts:[]}).type,production?ArticlesHome:PublicTimeline)
-assert.equal(CategoriesPage().type,production?ArticleCategories:Categories)
-assert.equal((await TagPage({params:Promise.resolve({tag:'ai'})})).type,production?ListLayout:PublicTimeline)
-assert.equal((await TagPagination({params:Promise.resolve({tag:'ai',page:'1'})})).type,production?ListLayout:PublicTimeline)
-assert.equal(navigation.some(item=>item.href==='/notes/'),!production)
+const discover=!production || ${expectedProductionDiscovery}
+assert.equal(productionNotesDiscoveryEnabled,${expectedProductionDiscovery})
+assert.equal(notesDiscoveryEnabled,discover)
+assert.equal(Main({posts:[]}).type,discover?PublicTimeline:ArticlesHome)
+assert.equal(CategoriesPage().type,discover?Categories:ArticleCategories)
+assert.equal((await TagPage({params:Promise.resolve({tag:'ai'})})).type,discover?PublicTimeline:ListLayout)
+assert.equal((await TagPagination({params:Promise.resolve({tag:'ai',page:'1'})})).type,discover?PublicTimeline:ListLayout)
+assert.equal(navigation.some(item=>item.href==='/notes/'),discover)
 assert.equal(navigation.some(item=>item.href==='/draft'),!production)
-assert.equal(metadata.description.includes('隨筆'),!production)
+assert.equal(metadata.description.includes('隨筆'),discover)
 assert.equal((await DraftPage()).type,DraftTimeline)
 assert.equal(NotesShell().type,NotesSlot)
-console.log('PASS '+${JSON.stringify(mode)}+': homepage/categories/navigation gated; direct shell and draft view retained')
+assert.equal(robots().sitemap.some(url=>url.endsWith('/notes/sitemap.xml')),discover)
+assert.equal(sitemap().some(item=>item.url.endsWith('/notes/')),discover)
+assert.ok(sitemap().every(item=>!item.url.includes('/draft')&&!item.url.includes('/notes-shell')))
+console.log('PASS '+${JSON.stringify(mode)}+': homepage/categories/navigation rollout verified; direct shell and draft view retained')
 `
   const result = await build({
     absWorkingDir: blog,
@@ -120,7 +127,7 @@ console.log('PASS '+${JSON.stringify(mode)}+': homepage/categories/navigation ga
               contents =
                 'export const sortPosts=x=>x;export const allCoreContent=x=>x;'
             if (args.path === 'contentlayer/generated')
-              contents = `export const allBlogs=${JSON.stringify(sample)}`
+              contents = `export const allAuthors=[];export const allBlogs=${JSON.stringify(sample)}`
             if (args.path === 'app/seo')
               contents = 'export const genPageMetadata=x=>x;'
             if (args.path === 'next/navigation')
