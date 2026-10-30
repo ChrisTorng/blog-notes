@@ -1,7 +1,8 @@
 'use client'
 import { notesDiscoveryEnabled } from '@/data/notesSettings'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from '@/components/Link'
 import { Rss } from '@/components/social-icons/icons'
 import Tag from '@/components/Tag'
@@ -32,6 +33,23 @@ type Entry = {
   tags: string[]
 }
 const PER_PAGE = 20
+
+// Keep URL state in a small Suspense boundary so article HTML is still exported.
+function TimelineLocation({
+  initialPage,
+  onPageChange,
+}: {
+  initialPage: number
+  onPageChange: (page: number) => void
+}) {
+  const searchParams = useSearchParams()
+  const queryPage = searchParams.get('page')
+  useEffect(() => {
+    const value = Number(queryPage)
+    onPageChange(Number.isSafeInteger(value) && value > 0 ? value : initialPage)
+  }, [queryPage, initialPage, onPageChange])
+  return null
+}
 
 export default function PublicTimeline({
   articles,
@@ -69,15 +87,6 @@ export default function PublicTimeline({
   const [warning, setWarning] = useState('')
   const [admin, setAdmin] = useState(false)
   const [loading, setLoading] = useState(false)
-  useEffect(() => {
-    const sync = () => {
-      const value = Number(new URLSearchParams(location.search).get('page'))
-      setPage(Number.isSafeInteger(value) && value > 0 ? value : initialPage)
-    }
-    sync()
-    window.addEventListener('popstate', sync)
-    return () => window.removeEventListener('popstate', sync)
-  }, [initialPage])
   useEffect(() => {
     if (!notesDiscoveryEnabled) return
     const controller = new AbortController()
@@ -149,6 +158,9 @@ export default function PublicTimeline({
   }
   return (
     <div className="responsive-layout-container divide-y divide-gray-200 dark:divide-gray-700">
+      <Suspense fallback={null}>
+        <TimelineLocation initialPage={initialPage} onPageChange={setPage} />
+      </Suspense>
       <div className="space-y-2 pt-6 pb-8 md:space-y-5">
         <div className="flex justify-end">
           <Link
