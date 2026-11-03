@@ -9,6 +9,8 @@ const local = ['localhost', '127.0.0.1'].includes(location.hostname)
 const tokenKey = 'blog-notes-local-token'
 const draftKey = 'blog-notes-editor-unsaved'
 const empty = { title: null, markdown: '', tags: [] }
+let bookmarkRef = null
+const pendingBookmark = new URLSearchParams(location.search).get('bookmark')
 const state = {
   id: null,
   status: 'draft',
