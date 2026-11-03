@@ -54,6 +54,7 @@ export function plainText(markdown) {
 export function noteTitle(note) {
   return (
     note.title ||
+    note.bookmark_title ||
     plainText(
       String(note.markdown)
         .split(/\r?\n/)
