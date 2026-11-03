@@ -137,7 +137,7 @@ textarea:focus {
 .compose-pane,
 .preview-pane {
   display: grid;
-  grid-template-rows: 36px 72px 24px minmax(0, 1fr);
+  grid-template-rows: 36px 92px 24px minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--line);
@@ -334,7 +334,7 @@ textarea:focus {
   }
   .compose-pane,
   .preview-pane {
-    grid-template-rows: 34px 64px 24px minmax(0, 1fr);
+    grid-template-rows: 34px 90px 24px minmax(0, 1fr);
   }
   .tag-select {
     flex-basis: 100%;
@@ -365,3 +365,7 @@ dialog h2 {
   gap: 12px;
   margin-top: 24px;
 }
+
+.compose-pane .title-field{flex-direction:column;align-items:stretch;justify-content:center;gap:5px}
+.bookmark-reference{width:100%;min-width:0;font-size:.77rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.bookmark-reference a{overflow-wrap:anywhere;text-decoration:underline;text-underline-offset:2px}
