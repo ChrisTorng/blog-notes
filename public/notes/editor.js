@@ -155,7 +155,25 @@ function schedulePreview() {
   clearTimeout(timer)
   timer = setTimeout(preview, 180)
 }
+function updateBookmarkRef() {
+  let node = $('bookmarkReference')
+  if (!node) {
+    node = document.createElement('div')
+    node.id = 'bookmarkReference'
+    node.className = 'bookmark-reference'
+    document.querySelector('.compose-pane .title-field')?.after(node)
+  }
+  node.replaceChildren()
+  if (!bookmarkRef) return
+  const link = document.createElement('a')
+  link.href = '/bookmarks/' + encodeURIComponent(bookmarkRef.id) + '/'
+  link.target = '_blank'
+  link.textContent = '來源書籤：' + (bookmarkRef.title || bookmarkRef.url)
+  node.append(link)
+}
 function load(item = {}) {
+  bookmarkRef = item.bookmark_id ? {id:item.bookmark_id,title:item.bookmark_title,url:item.bookmark_url} : null
+  updateBookmarkRef()
   $('title').value = item.title || ''
   $('markdown').value = item.markdown || ''
   state.status = item.status || 'draft'
