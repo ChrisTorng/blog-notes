@@ -161,7 +161,7 @@ function updateBookmarkRef() {
     node = document.createElement('div')
     node.id = 'bookmarkReference'
     node.className = 'bookmark-reference'
-    document.querySelector('.compose-pane .title-field')?.after(node)
+    document.querySelector('.compose-pane .title-field')?.append(node)
   }
   node.replaceChildren()
   if (!bookmarkRef) return
@@ -270,9 +270,16 @@ async function loadBookmarkIfRequested() {
   }
   bookmarkRef = {id:item.id,title:item.title,url:item.url}
   if (!$('title').value.trim()) $('title').value = item.title.slice(0,160)
+  if (!$('markdown').value.trim()) {
+    const safeTitle = item.title.replaceAll('\\', '\\\\').replaceAll('[', '\\[').replaceAll(']', '\\]')
+    const safeUrl = item.url.replaceAll('<','%3C').replaceAll('>','%3E')
+    $('markdown').value = '[' + safeTitle + '](<' + safeUrl + '>)' +
+      (item.summary?.trim() ? '\n\n' + item.summary.trim() : '') + '\n\n'
+  }
   updateBookmarkRef()
+  remember()
   schedulePreview()
-  notice('已引用書籤')
+  notice('已帶入原文連結與摘要，可直接編輯')
 }
 async function login() {
   if (local) {
