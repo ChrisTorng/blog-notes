@@ -33,11 +33,19 @@ replaceOnce(
     : []),`
 )
 
+// Upgrade existing Worker links without duplicating the earlier Notes branch.
+const linkTarget = path.join(blog, 'components/Link.tsx')
+fs.writeFileSync(
+  linkTarget,
+  fs
+    .readFileSync(linkTarget, 'utf8')
+    .replace('/^\\/notes(?:\\/|$)/', '/^\\/(?:notes|bookmarks)(?:\\/|$)/')
+)
 replaceOnce(
   'components/Link.tsx',
-  '/^\\/notes(?:\\/|$)/',
+  '/^\\/(?:notes|bookmarks)(?:\\/|$)/',
   '  if (isInternalLink) {',
-  `  if (isInternalLink && /^\\/notes(?:\\/|$)/.test(href)) {
+  `  if (isInternalLink && /^\\/(?:notes|bookmarks)(?:\\/|$)/.test(href)) {
     return <a className={linkClassName} href={href} {...rest} />
   }
 
@@ -78,7 +86,6 @@ if (
 )
   throw Error('Review existing draft page before replacing it')
 fs.writeFileSync(draftPath, draftSource)
-console.log('Installed Notes integration')
 
 for (const file of [
   'app/Main.tsx',
@@ -101,8 +108,14 @@ for (const file of ['app/robots.ts', 'app/sitemap.ts']) {
   const source = fs.readFileSync(path.join(here, 'blog', file), 'utf8')
   const target = path.join(blog, file)
   const previous = fs.readFileSync(target, 'utf8')
-  const originalFunction = file.includes('robots') ? 'function robots()' : 'function sitemap()'
-  if (previous !== source && (!previous.includes(originalFunction) || previous.includes('notesDiscoveryEnabled')))
+  const originalFunction = file.includes('robots')
+    ? 'function robots()'
+    : 'function sitemap()'
+  if (
+    previous !== source &&
+    (!previous.includes(originalFunction) ||
+      previous.includes('notesDiscoveryEnabled'))
+  )
     throw Error('Review existing SEO route before replacing: ' + file)
   fs.writeFileSync(target, source)
 }
@@ -123,10 +136,20 @@ let navigation = fs
   .replace(", { href: '/notes/all/', title: '全部' }", '')
 fs.writeFileSync(path.join(blog, 'data/headerNavLinks.ts'), navigation)
 
-fs.writeFileSync(
-  path.join(blog, 'data/headerNavLinks.ts'),
-  fs.readFileSync(path.join(here, 'blog/data/headerNavLinks.ts'), 'utf8')
-)
+// Preserve Bookmarks and any other navigation installed by the blog.
+const navigationPath = path.join(blog, 'data/headerNavLinks.ts')
+let installedNavigation = fs
+  .readFileSync(navigationPath, 'utf8')
+  .replace(
+    /process\.env\.NODE_ENV !== 'production'\s*\? \[\{ href: '\/notes\/', title: '隨筆' \}\]/,
+    "notesDiscoveryEnabled ? [{ href: '/notes/', title: '隨筆' }]"
+  )
+if (!installedNavigation.includes('import { notesDiscoveryEnabled }')) {
+  installedNavigation =
+    "import { notesDiscoveryEnabled } from './notesSettings'\n" +
+    installedNavigation
+}
+fs.writeFileSync(navigationPath, installedNavigation)
 
 const listFile = 'layouts/ListLayoutWithTags.tsx'
 const listTarget = path.join(blog, listFile)
@@ -137,3 +160,5 @@ fs.writeFileSync(
   listTarget,
   fs.readFileSync(path.join(here, 'blog', listFile), 'utf8')
 )
+
+console.log('Installed Notes integration')
