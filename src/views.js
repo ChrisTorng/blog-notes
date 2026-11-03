@@ -94,9 +94,9 @@ export function noteCard(note, { showTitle = true } = {}) {
   const link = notePath(note.id)
   const date = note.published_at || note.created_at
   return `<article class="entry note" data-note-id="${htmlEscape(note.id)}"><div class="entry-meta"><time datetime="${htmlEscape(date)}">${htmlEscape(formatNoteDate(date))}</time></div>
-${showTitle && note.title ? `<h2><a class="title-link" href="${link}">${htmlEscape(note.title)}</a></h2>` : ''}
+${showTitle && (note.title || note.bookmark_title) ? `<h2><a class="title-link" href="${link}">${htmlEscape(note.title || note.bookmark_title)}</a></h2>` : ''}
 <div class="entry-tags">${tagLinks(note)}</div>
-${note.bookmark_id ? `<aside class="bookmark-reference">來源書籤：<a href="/bookmarks/${encodeURIComponent(note.bookmark_id)}/">${htmlEscape(note.bookmark_title || note.bookmark_url || "書籤")}</a></aside>` : ""}
+${note.bookmark_id ? `<aside class="bookmark-reference"><span>參考書籤：</span><a href="/bookmarks/${encodeURIComponent(note.bookmark_id)}/">${htmlEscape(note.bookmark_title || note.bookmark_url || "書籤")}</a></aside>` : ""}
 <div class="prose dark:prose-invert">${renderMarkdown(note.markdown)}</div>
 </article>`
 }
