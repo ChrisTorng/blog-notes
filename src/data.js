@@ -26,10 +26,21 @@ export function checkNoteInput(value) {
   if (title && title.length > 160) throw new Error('標題不得超過 160 字元')
   if (!['draft', 'published'].includes(status))
     throw new Error('狀態必須是 draft 或 published')
-  return { title, markdown, status, tags: cleanTags(value.tags ?? []) }
+  const bookmarkId = value.bookmark_id || null
+  const bookmarkTitle = value.bookmark_title || null
+  const bookmarkUrl = value.bookmark_url || null
+  if (bookmarkId && !/^[0-9a-f-]{36}$/.test(bookmarkId))
+    throw new Error('書籤 ID 格式無效')
+  if (bookmarkUrl && !/^https?:\/\//.test(bookmarkUrl))
+    throw new Error('書籤網址格式無效')
+  if ((bookmarkTitle && !bookmarkId) || (bookmarkUrl && !bookmarkId))
+    throw new Error('缺少書籤 ID')
+  return { title, markdown, status, tags: cleanTags(value.tags ?? []),
+    bookmark_id: bookmarkId, bookmark_title: bookmarkTitle, bookmark_url: bookmarkUrl }
 }
 
 const fields = `n.id, n.title, n.markdown, n.status, n.created_at, n.updated_at, n.published_at,
+  n.bookmark_id, n.bookmark_title, n.bookmark_url,
   COALESCE((SELECT json_group_array(tag_id) FROM note_tags WHERE note_id=n.id), '[]') AS tags`
 
 function decode(note) {
@@ -96,8 +107,8 @@ export async function createNote(db, raw) {
   const statements = [
     db
       .prepare(
-        `INSERT INTO notes(id,title,markdown,status,created_at,published_at,updated_at)
-    VALUES(?,?,?,?,?,?,?)`
+        `INSERT INTO notes(id,title,markdown,status,created_at,published_at,updated_at,bookmark_id,bookmark_title,bookmark_url)
+    VALUES(?,?,?,?,?,?,?,?,?,?)`
       )
       .bind(
         id,
@@ -106,7 +117,10 @@ export async function createNote(db, raw) {
         input.status,
         now,
         input.status === 'published' ? now : null,
-        now
+        now,
+        input.bookmark_id,
+        input.bookmark_title,
+        input.bookmark_url
       ),
   ]
   statements.push(
@@ -130,9 +144,9 @@ export async function updateNote(db, id, raw) {
   const stmts = [
     db
       .prepare(
-        'UPDATE notes SET title=?, markdown=?, status=?, published_at=?, updated_at=? WHERE id=?'
+        'UPDATE notes SET title=?, markdown=?, status=?, published_at=?, updated_at=?, bookmark_id=?, bookmark_title=?, bookmark_url=? WHERE id=?'
       )
-      .bind(input.title, input.markdown, input.status, publishedAt, now, id),
+      .bind(input.title, input.markdown, input.status, publishedAt, now, input.bookmark_id, input.bookmark_title, input.bookmark_url, id),
     db.prepare('DELETE FROM note_tags WHERE note_id=?').bind(id),
     ...input.tags.map((tag) =>
       db
