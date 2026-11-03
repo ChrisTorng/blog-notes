@@ -283,6 +283,7 @@ async function login() {
   try {
     await refreshList()
     if (state.pendingId) await openNote(state.pendingId)
+    else await loadBookmarkIfRequested()
     await preview()
     notice('已登入')
   } catch (error) {
@@ -435,6 +436,7 @@ try {
     await openNote(state.pendingId, false)
   else {
     if (state.id) updateUrl()
+    await loadBookmarkIfRequested()
     await preview()
   }
 } catch {
