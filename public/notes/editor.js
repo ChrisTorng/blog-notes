@@ -248,6 +248,32 @@ async function refreshList() {
   $('auth').hidden = true
   $('toggleAuth').setAttribute('aria-expanded', 'false')
 }
+async function loadBookmarkIfRequested() {
+  if (!pendingBookmark || state.id || bookmarkRef) return
+  if (!/^[0-9a-f-]{36}$/.test(pendingBookmark)) return
+  const headers = {}
+  if (local) {
+    const token = sessionStorage.getItem('blog-bookmarks-admin-token')
+    if (token) headers.Authorization = 'Bearer ' + token
+  }
+  const response = await fetch('/bookmarks/api/admin/' + pendingBookmark, {
+    headers, credentials:'same-origin', cache:'no-store'
+  })
+  if (!response.ok) {
+    notice('無法取得來源書籤，請先登入 Bookmarks 管理後台', true)
+    return
+  }
+  const item = await response.json()
+  if (!item?.id || item.status < 2) {
+    notice('請先公開此書籤，再建立隨筆', true)
+    return
+  }
+  bookmarkRef = {id:item.id,title:item.title,url:item.url}
+  if (!$('title').value.trim()) $('title').value = item.title.slice(0,160)
+  updateBookmarkRef()
+  schedulePreview()
+  notice('已引用書籤')
+}
 async function login() {
   if (local) {
     const token = $('localToken').value.trim()
