@@ -34,6 +34,9 @@ function values(status = state.status) {
     tags: [...document.querySelectorAll('.tag-check:checked')].map(
       (el) => el.value
     ),
+    bookmark_id: bookmarkRef?.id || null,
+    bookmark_title: bookmarkRef?.title || null,
+    bookmark_url: bookmarkRef?.url || null,
   }
 }
 function dirty() {
