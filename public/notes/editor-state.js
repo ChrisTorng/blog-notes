@@ -3,6 +3,9 @@ export function editableSnapshot(entry) {
     title: String(entry.title || '').trim() || null,
     markdown: String(entry.markdown || ''),
     tags: [...(entry.tags || [])].sort(),
+    bookmark_id: entry.bookmark_id || null,
+    bookmark_title: entry.bookmark_title || null,
+    bookmark_url: entry.bookmark_url || null,
   })
 }
 
