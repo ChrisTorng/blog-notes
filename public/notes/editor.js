@@ -264,7 +264,7 @@ async function loadBookmarkIfRequested() {
     return
   }
   const item = await response.json()
-  if (!item?.id || item.status < 2) {
+  if (!item?.id || item.status < 3) {
     notice('請先公開此書籤，再建立隨筆', true)
     return
   }
