@@ -111,25 +111,10 @@ try {
     })
   ).json()
   const firstPublished = note.published_at
-  const themed = await call(`/notes/${note.id}/`)
+  const publicNote = await (await call('/notes/api/' + note.id)).json()
   verify(
-    themed.headers.get('X-Notes-Theme') === 'main-site',
-    'public page uses the main site shell'
-  )
-  const rendered = await themed.text()
-  verify(
-    /<svg\b[^>]*>[\s\S]*?<title>/.test(rendered),
-    'shared site SVG accessibility titles survive rewriting'
-  )
-  const jsonld = rendered.match(
-    /<script type="application\/ld\+json">(.*?)<\/script>/s
-  )?.[1]
-  verify(
-    JSON.parse(jsonld).headline === marker &&
-      rendered.includes('<strong>粗體</strong>') &&
-      !rendered.includes('<script>alert(1)</script>') &&
-      !rendered.includes('href="javascript:'),
-    'SSR Markdown, XSS protection and valid JSON-LD'
+    publicNote.id === note.id && publicNote.markdown.includes('**粗體**'),
+    'public API returns raw Markdown; GitHub Pages renders the UI'
   )
   const preview = await (
     await call(admin + 'preview', {
@@ -159,12 +144,11 @@ try {
     '/notes/editor.js',
     '/notes/editor/',
   ])
-    await call(path)
-  const head = await call(`/notes/${note.id}/`, { method: 'HEAD' })
+    await call(path, { status: 404 })
+  const head = await call('/notes/api/' + note.id, { method: 'HEAD' })
   verify(
-    !(await head.text()) &&
-      head.headers.get('content-type').includes('text/html'),
-    'HEAD and editor static assets work'
+    !(await head.text()) && head.headers.get('content-type').includes('application/json'),
+    'HEAD API works; static editor assets belong to GitHub Pages'
   )
   for (let offset = 0; offset < 105; offset += 5)
     await Promise.all(
@@ -263,15 +247,11 @@ try {
     seen.size === combined.total && blogSeen && noteSeen,
     'all mixed timeline pages contain both real articles and notes without gaps or duplicates'
   )
-  const legacy = await fetch(base + '/notes/all/', { redirect: 'manual' })
-  verify(
-    legacy.status === 302 && legacy.headers.get('Location') === '/',
-    'legacy All URL redirects to the homepage'
-  )
+  await call('/notes/all/', { status: 404 })
   await call('/notes/page/100000/', { status: 404 })
-  await call('/notes/')
-  await call('/notes')
-  await call('/notes/?tag=ai')
+  await call('/notes/', { status: 404 })
+  await call('/notes', { status: 404 })
+  await call('/notes/?tag=ai', { status: 404 })
   const music = await (await call('/notes/api/all?tag=music')).json()
   verify(
     music.items.every((item) => item.tags.includes('music')),
