@@ -70,8 +70,8 @@ function ListWithCategories({
   });
   const displayPosts = initialDisplayPosts.length > 0 ? initialDisplayPosts : posts;
   return /* @__PURE__ */ jsx(Fragment, { children: /* @__PURE__ */ jsxs("div", { children: [
-    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-4 pt-6 pb-6", children: [
-      /* @__PURE__ */ jsx("h1", { className: "heading-accent text-3xl leading-9 font-extrabold tracking-tight sm:hidden sm:text-4xl sm:leading-10 md:text-6xl md:leading-14", children: title }),
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-4 pt-5 pb-6", children: [
+      /* @__PURE__ */ jsx("h1", { className: "heading-accent text-3xl leading-9 font-extrabold tracking-tight sm:text-4xl sm:leading-10 md:text-5xl md:leading-14", children: [title, /* @__PURE__ */ jsx("small", { className: "ml-3 text-base font-normal tracking-normal text-gray-500 md:text-xl dark:text-gray-400", children: title.startsWith("隨筆") ? "Notes" : title.includes("文章") ? "Articles" : "" })] }),
       /* @__PURE__ */ jsxs(
         Link,
         {
@@ -104,37 +104,37 @@ function ListWithCategories({
         }
       )
     ] }),
-    /* @__PURE__ */ jsxs("div", { className: "flex sm:space-x-24", children: [
-      /* @__PURE__ */ jsx("div", { className: "hidden h-full max-h-screen max-w-[280px] min-w-[280px] flex-wrap overflow-auto rounded-sm bg-gray-100 pt-5 shadow-md sm:flex dark:bg-gray-800/70 dark:shadow-gray-800/40", children: /* @__PURE__ */ jsxs("div", { className: "px-6 py-4", children: [
-        rootActive ? /* @__PURE__ */ jsx("h3", { className: "text-primary-500 font-bold uppercase", children: rootLabel }) : /* @__PURE__ */ jsx(
+    /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 items-start gap-8 sm:grid-cols-[244px_minmax(0,1fr)] lg:gap-12", children: [
+      /* @__PURE__ */ jsx("aside", { className: "hidden w-full rounded-xl border border-gray-200/70 bg-gray-100/60 p-4 sm:block dark:border-gray-700/50 dark:bg-gray-800/70", children: /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
+        rootActive ? /* @__PURE__ */ jsx("h3", { className: "text-primary-500 rounded-md px-2 py-2 font-bold", children: rootLabel }) : /* @__PURE__ */ jsx(
           Link,
           {
             href: rootHref,
-            className: "hover:text-primary-500 dark:hover:text-primary-500 font-bold text-gray-700 uppercase dark:text-gray-300",
+            className: "hover:text-primary-500 dark:hover:text-primary-500 block rounded-md px-2 py-2 font-bold text-gray-700 dark:text-gray-300",
             children: rootLabel
           }
         ),
-        /* @__PURE__ */ jsx("ul", { children: categories.map(({ id, displayName, count, href }) => {
-          return /* @__PURE__ */ jsx("li", { className: "my-3", children: activeTag === id ? /* @__PURE__ */ jsx("h3", { className: "text-primary-500 inline px-3 py-2 text-sm font-bold uppercase", children: `${displayName} (${count})` }) : /* @__PURE__ */ jsx(
+        /* @__PURE__ */ jsx("ul", { className: "mt-2 border-t border-gray-200/70 pt-2 pl-3 dark:border-gray-700/60", children: categories.map(({ id, displayName, count, href }) => {
+          return /* @__PURE__ */ jsx("li", { className: "my-2", children: activeTag === id ? /* @__PURE__ */ jsx("h3", { className: "text-primary-500 inline-flex items-baseline rounded-md bg-blue-500/5 px-2 py-1.5 text-sm font-bold", children: [displayName, /* @__PURE__ */ jsxs("span", { className: "ml-3 opacity-70", children: ["(", count, ")"] })] }) : /* @__PURE__ */ jsx(
             Link,
             {
               href,
-              className: "hover:text-primary-500 dark:hover:text-primary-500 px-3 py-2 text-sm font-medium text-gray-500 uppercase dark:text-gray-300",
+              className: "hover:text-primary-500 dark:hover:text-primary-500 inline-flex items-baseline rounded-md px-2 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-300",
               "aria-label": `\u6AA2\u8996\u985E\u5225 ${displayName}`,
-              children: `${displayName} (${count})`
+              children: [displayName, /* @__PURE__ */ jsxs("span", { className: "ml-3 opacity-70", children: ["(", count, ")"] })]
             }
           ) }, id);
         }) })
       ] }) }),
-      /* @__PURE__ */ jsxs("div", { children: [
+      /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
         /* @__PURE__ */ jsx("ul", { children: displayPosts.map((post) => {
           const { path, href, date, title: title2, subtitle, summary, html, tags, noteId } = post;
-          return /* @__PURE__ */ jsx("li", { className: "py-5", children: /* @__PURE__ */ jsxs("article", { className: "flex flex-col space-y-2 xl:space-y-0", "data-note-id": noteId, children: [
+          return /* @__PURE__ */ jsx("li", { className: "border-b border-gray-200/60 py-4 last:border-0 dark:border-gray-700/60", children: /* @__PURE__ */ jsxs("article", { className: "flex flex-col space-y-2 xl:space-y-0", "data-note-id": noteId, children: [
             /* @__PURE__ */ jsxs("dl", { children: [
               /* @__PURE__ */ jsx("dt", { className: "sr-only", children: "\u767C\u4F48\u65BC" }),
               /* @__PURE__ */ jsx("dd", { className: "text-base leading-6 font-medium text-gray-500 dark:text-gray-400", children: /* @__PURE__ */ jsx("time", { dateTime: date, suppressHydrationWarning: true, children: noteId ? formatNoteDate(date) : formatDate(date, locale) }) })
             ] }),
-            /* @__PURE__ */ jsxs("div", { className: "space-y-3", children: [
+            /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
               /* @__PURE__ */ jsxs("div", { children: [
                 /* @__PURE__ */ jsx("h2", { className: "text-2xl leading-8 font-bold tracking-tight", children: /* @__PURE__ */ jsx(Link, { href, className: "title-link", children: title2 }) }),
                 subtitle && /* @__PURE__ */ jsx("p", { className: "mt-1 text-lg leading-7 font-semibold text-gray-700 dark:text-gray-300", children: subtitle }),
