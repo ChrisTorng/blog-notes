@@ -63,7 +63,7 @@ test('Notes listing follows article layout with a visible RSS link and topic nav
     siteUrl: 'https://example.org',
   })
   assert.ok(html.includes('href="/notes/feed.xml?tag=ai"'))
-  assert.ok(html.includes('AI (0)'))
+  assert.match(html,/AI<\/[^>]+><span class="ml-3 opacity-70">\(0\)<\/span>|AI<span class="ml-3 opacity-70">\(0\)<\/span>/)
   assert.ok(html.includes('2026/10/27 08:00'))
   assert.ok(!html.includes('永久連結'))
   assert.ok(!html.includes('晚'))
@@ -104,7 +104,7 @@ test('pagination retains the topic on previous and next links', () => {
     siteUrl: 'https://example.org',
     tagCounts: { ai: 41 },
   })
-  assert.ok(html.includes('AI (41)'))
+  assert.match(html,/AI<span class="ml-3 opacity-70">\(41\)<\/span>/)
   assert.ok(html.includes('href="/notes/?tag=ai" rel="prev"'))
   assert.ok(html.includes('href="/notes/page/3/?tag=ai" rel="next"'))
   assert.ok(html.includes('2/3'))

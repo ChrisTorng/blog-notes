@@ -146,9 +146,10 @@ export default function ListWithCategories({
   return (
     <>
       <div>
-        <div className="flex items-center justify-between gap-4 pt-6 pb-6">
-          <h1 className="heading-accent text-3xl leading-9 font-extrabold tracking-tight sm:hidden sm:text-4xl sm:leading-10 md:text-6xl md:leading-14">
+        <div className="flex items-center justify-between gap-4 pt-5 pb-6">
+          <h1 className="heading-accent text-3xl leading-9 font-extrabold tracking-tight sm:text-4xl sm:leading-10 md:text-5xl md:leading-14">
             {title}
+            <small className="ml-3 text-base font-normal tracking-normal text-gray-500 md:text-xl dark:text-gray-400">{title.startsWith('隨筆') ? 'Notes' : title.includes('文章') ? 'Articles' : ''}</small>
           </h1>
           <Link
             href={rssHref}
@@ -174,34 +175,34 @@ export default function ListWithCategories({
             {rssTitle}
           </Link>
         </div>
-        <div className="flex sm:space-x-24">
-          <div className="hidden h-full max-h-screen max-w-[280px] min-w-[280px] flex-wrap overflow-auto rounded-sm bg-gray-100 pt-5 shadow-md sm:flex dark:bg-gray-800/70 dark:shadow-gray-800/40">
-            <div className="px-6 py-4">
+        <div className="grid grid-cols-1 items-start gap-8 sm:grid-cols-[244px_minmax(0,1fr)] lg:gap-12">
+          <aside className="hidden w-full rounded-xl border border-gray-200/70 bg-gray-100/60 p-4 sm:block dark:border-gray-700/50 dark:bg-gray-800/70">
+            <div className="min-w-0">
               {rootActive ? (
-                <h3 className="text-primary-500 font-bold uppercase">{rootLabel}</h3>
+                <h3 className="text-primary-500 rounded-md px-2 py-2 font-bold">{rootLabel}</h3>
               ) : (
                 <Link
                   href={rootHref}
-                  className="hover:text-primary-500 dark:hover:text-primary-500 font-bold text-gray-700 uppercase dark:text-gray-300"
+                  className="hover:text-primary-500 dark:hover:text-primary-500 block rounded-md px-2 py-2 font-bold text-gray-700 dark:text-gray-300"
                 >
                   {rootLabel}
                 </Link>
               )}
-              <ul>
+              <ul className="mt-2 border-t border-gray-200/70 pt-2 pl-3 dark:border-gray-700/60">
                 {categories.map(({ id, displayName, count, href }) => {
                   return (
-                    <li key={id} className="my-3">
+                    <li key={id} className="my-2">
                       {activeTag === id ? (
-                        <h3 className="text-primary-500 inline px-3 py-2 text-sm font-bold uppercase">
-                          {`${displayName} (${count})`}
+                        <h3 className="text-primary-500 inline-flex items-baseline rounded-md bg-blue-500/5 px-2 py-1.5 text-sm font-bold">
+                          {displayName}<span className="ml-3 opacity-70">({count})</span>
                         </h3>
                       ) : (
                         <Link
                           href={href}
-                          className="hover:text-primary-500 dark:hover:text-primary-500 px-3 py-2 text-sm font-medium text-gray-500 uppercase dark:text-gray-300"
+                          className="hover:text-primary-500 dark:hover:text-primary-500 inline-flex items-baseline rounded-md px-2 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-300"
                           aria-label={`檢視類別 ${displayName}`}
                         >
-                          {`${displayName} (${count})`}
+                          {displayName}<span className="ml-3 opacity-70">({count})</span>
                         </Link>
                       )}
                     </li>
@@ -209,13 +210,13 @@ export default function ListWithCategories({
                 })}
               </ul>
             </div>
-          </div>
-          <div>
+          </aside>
+          <div className="min-w-0">
             <ul>
               {displayPosts.map((post) => {
                 const { path, href, date, title, subtitle, summary, html, tags, noteId } = post
                 return (
-                  <li key={path} className="py-5">
+                  <li key={path} className="border-b border-gray-200/60 py-4 last:border-0 dark:border-gray-700/60">
                     <article className="flex flex-col space-y-2 xl:space-y-0" data-note-id={noteId}>
                       <dl>
                         <dt className="sr-only">發佈於</dt>
@@ -225,7 +226,7 @@ export default function ListWithCategories({
                           </time>
                         </dd>
                       </dl>
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         <div>
                           <h2 className="text-2xl leading-8 font-bold tracking-tight">
                             <Link href={href} className="title-link">
