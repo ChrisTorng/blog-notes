@@ -1,3 +1,7 @@
+## 架構分工（2026-11-05）
+
+本 repo 的 Cloudflare Worker 僅處理 `/notes/api*`（D1／Access 管理 API）、`/notes/feed.xml*`、`/notes/all/feed.xml*`、`/notes/sitemap.xml*`（資料輸出）。隨筆列表、詳情、編輯器及 HTML/JS/CSS 已移至 `ChrisTorng/christorng.github.io` GitHub Pages；純 UI 修改不部署 Worker。Markdown 預覽屬受驗證的 JSON API 格式轉換，公開閱讀 Markdown 在瀏覽器渲染。既有 D1 與歷史 Migration 保留；正式部署絕不自動重跑一次性 Migration。舊 SSR 版型檔暫存作遷移參考，不是 Worker 執行入口。
+
 # blog-notes
 
 Markdown notes for <https://christorng.idv.tw/notes/>. Cloudflare Worker + D1; editor at /notes/editor/.
