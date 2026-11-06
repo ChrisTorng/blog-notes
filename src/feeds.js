@@ -7,7 +7,7 @@ import {
   noteTitle,
   plainText,
   renderMarkdown,
-} from './views.js'
+} from './markdown.js'
 
 function isoSafe(date) {
   const result = new Date(date)
