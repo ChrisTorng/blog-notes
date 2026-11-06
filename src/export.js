@@ -1,6 +1,6 @@
 import { Zip, ZipDeflate, strToU8 } from 'fflate'
 import { allTags, exportNoteBatch } from './data.js'
-import { noteTitle } from './views.js'
+import { noteTitle } from './markdown.js'
 
 export function noteMarkdown(note) {
   const fields = {
