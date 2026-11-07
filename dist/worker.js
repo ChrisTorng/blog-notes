@@ -32032,6 +32032,20 @@ var htmlEscape = /* @__PURE__ */ __name((value) => String(value ?? "").replace(/
   '"': "&quot;",
   "'": "&#39;"
 })[ch]), "htmlEscape");
+function renderPublicMarkdown(input, siteUrl2) {
+  const root = new URL("/", siteUrl2).href;
+  return renderMarkdown(input).replace(/\b(href|src)="([^"]*)"/g, (full, attribute2, encoded) => {
+    try {
+      const value = encoded.replaceAll("&amp;", "&");
+      const url = new URL(value, root);
+      if (!["https:", "http:", "mailto:"].includes(url.protocol)) return attribute2 + '="#"';
+      return attribute2 + '="' + htmlEscape(url.href) + '"';
+    } catch {
+      return attribute2 + '="#"';
+    }
+  });
+}
+__name(renderPublicMarkdown, "renderPublicMarkdown");
 function plainText(markdown) {
   const text2 = [];
   function visit(tokens) {
@@ -33197,26 +33211,37 @@ async function readLimitedText(message2, limit) {
 }
 __name(readLimitedText, "readLimitedText");
 
+// src/public-content.js
+var names = new Map(allTags.map((t) => [t.id, t.displayName]));
+var displayTag = /* @__PURE__ */ __name((id) => names.get(id) || id, "displayTag");
+function noteArticleHtml(note, siteUrl2) {
+  const date = (note.published_at || note.created_at).slice(0, 10);
+  const tags = note.tags.map((id) => '<a class="text-primary-500" href="/notes/?tag=' + encodeURIComponent(id) + '">#' + htmlEscape(displayTag(id)) + "</a>").join("");
+  const bookmark = note.bookmark_id ? '<a class="text-primary-500 mt-3 inline-block text-sm" href="/bookmarks/view/?id=' + encodeURIComponent(note.bookmark_id) + '">\u53C3\u8003\u66F8\u7C64 \u2197</a>' : "";
+  const markdown = renderPublicMarkdown(note.markdown, siteUrl2);
+  return '<article class="border-b border-gray-300/40 py-4 dark:border-gray-700"><time class="text-xs text-gray-500" datetime="' + htmlEscape(date) + '">' + htmlEscape(date) + '</time><h1 class="mt-2 text-xl leading-snug font-bold">' + htmlEscape(noteTitle(note)) + '</h1><div class="mt-3 prose max-w-none text-sm dark:prose-invert">' + markdown + "</div>" + bookmark + '<div class="mt-3 flex flex-wrap gap-2 text-sm">' + tags + "</div></article>";
+}
+__name(noteArticleHtml, "noteArticleHtml");
+
 // src/public-page.js
 async function publicNotePage(request, note) {
   const site = "ChrisTorng \u5B78\u7FD2\u5929\u5730";
   const origin = new URL(request.url).origin;
   const canonical = origin + "/notes/" + encodeURIComponent(note.slug) + "/";
   const title = noteTitle(note);
-  const text2 = String(note.markdown || "").replace(/[#*~[\]()>]/g, "").slice(0, 180);
-  const date = (note.published_at || note.created_at).slice(0, 10);
-  const tags = note.tags.map((t) => '<a class="text-primary-500" href="/notes/?tag=' + encodeURIComponent(t) + '">#' + htmlEscape(t) + "</a>").join("");
-  const markdown = renderMarkdown(note.markdown).replace(/\b(href|src)="([^"]+)"/g, (full, attr, value) => {
-    if (/^(?:[a-z][a-z0-9+.-]*:|#|\/\/)/i.test(value)) return full;
-    try {
-      return attr + '="' + htmlEscape(new URL(value.replaceAll("&amp;", "&"), origin + "/").href) + '"';
-    } catch {
-      return full;
-    }
-  });
-  const bookmarkLink = note.bookmark_id ? '<p class="mt-5"><a class="text-primary-500" href="/bookmarks/view/?id=' + encodeURIComponent(note.bookmark_id) + '">\u53C3\u8003\u66F8\u7C64 \u2197</a></p>' : "";
-  const body = '<section class="py-8"><a class="text-primary-500" href="/notes/">\u2190 \u96A8\u7B46\u5217\u8868</a><article class="mt-6"><time class="text-sm text-gray-500" datetime="' + htmlEscape(date) + '">' + htmlEscape(date) + '</time><h1 class="my-5 text-3xl font-bold">' + htmlEscape(title) + '</h1><div class="prose max-w-none dark:prose-invert">' + markdown + "</div>" + bookmarkLink + '<div class="mt-5 flex gap-3">' + tags + "</div></article></section>";
-  const meta = '<meta name="description" content="' + htmlEscape(text2) + '"><meta name="robots" content="index,follow"><link rel="canonical" href="' + htmlEscape(canonical) + '"><meta property="og:type" content="article"><meta property="og:title" content="' + htmlEscape(title) + '"><meta property="og:url" content="' + htmlEscape(canonical) + '"><meta property="og:description" content="' + htmlEscape(text2) + '"><link rel="alternate" type="application/rss+xml" title="\u6240\u6709\u96A8\u7B46 RSS | ' + site + '" href="/notes/feed.xml">';
+  const text2 = plainText(note.markdown).slice(0, 180);
+  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">\u2190 \u96A8\u7B46\u5217\u8868</a><div class="mt-4">' + noteArticleHtml(note, origin) + "</div></section>";
+  const jsonld = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: title,
+    datePublished: note.published_at || note.created_at,
+    dateModified: note.updated_at,
+    author: { "@type": "Person", name: "ChrisTorng" },
+    mainEntityOfPage: canonical,
+    description: text2
+  }).replace(/</g, "\\u003c");
+  const meta = '<meta name="description" content="' + htmlEscape(text2) + '"><meta name="robots" content="index,follow"><link rel="canonical" href="' + htmlEscape(canonical) + '"><meta property="og:type" content="article"><meta property="og:title" content="' + htmlEscape(title) + '"><meta property="og:url" content="' + htmlEscape(canonical) + '"><meta property="og:description" content="' + htmlEscape(text2) + '"><link rel="alternate" type="application/rss+xml" title="\u6240\u6709\u96A8\u7B46 RSS | ' + site + '" href="/notes/feed.xml"><script type="application/ld+json">' + jsonld + "<\/script>";
   const template = await fetch(origin + "/notes-shell/", { headers: { "Accept": "text/html" } });
   if (!template.ok) return new Response("\u7DB2\u7AD9\u7248\u578B\u66AB\u6642\u7121\u6CD5\u53D6\u5F97", { status: 503 });
   let rewrite = new HTMLRewriter().on("#notes-content", { element(el) {
@@ -37464,24 +37489,16 @@ function pubDate(date) {
   return new Date(isoSafe(date)).toUTCString();
 }
 __name(pubDate, "pubDate");
+var cdata2 = /* @__PURE__ */ __name((html) => "<![CDATA[" + String(html).replaceAll("]]>", "]]]]><![CDATA[>") + "]]>", "cdata");
 function noteRssItem(n, siteUrl2) {
-  const url = `${siteUrl2}${notePath(n)}`;
-  return `<item><title>${htmlEscape(noteTitle(n))}</title><link>${htmlEscape(url)}</link><guid isPermaLink="true">${htmlEscape(url)}</guid><pubDate>${pubDate(n.published_at || n.created_at)}</pubDate><description>${htmlEscape(plainText(n.markdown))}</description><content:encoded>${htmlEscape(
-    renderMarkdown(n.markdown).replace(
-      /\b(href|src)="([^"]*)"/g,
-      (match2, attr, value) => {
-        if (/^(?:[a-z][a-z0-9+.-]*:)/i.test(value)) return match2;
-        return attr + '="' + new URL(value.replaceAll("&amp;", "&"), url).href.replaceAll(
-          "&",
-          "&amp;"
-        ) + '"';
-      }
-    )
-  )}</content:encoded>${n.tags.map((t) => `<category>${htmlEscape(t)}</category>`).join("")}</item>`;
+  const url = siteUrl2 + notePath(n);
+  const content = noteArticleHtml(n, siteUrl2);
+  const categories = n.tags.map((id) => "<category>" + htmlEscape(displayTag(id)) + "</category>").join("");
+  return "<item><title>" + htmlEscape(noteTitle(n)) + "</title><link>" + htmlEscape(url) + '</link><guid isPermaLink="true">' + htmlEscape(url) + "</guid><pubDate>" + pubDate(n.published_at || n.created_at) + "</pubDate><description>" + htmlEscape(content) + "</description><content:encoded>" + cdata2(content) + "</content:encoded>" + categories + "</item>";
 }
 __name(noteRssItem, "noteRssItem");
 function articleRssItem(item) {
-  return `<item><title>${htmlEscape(item.title)}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(item.summary)}</description>${item.tags.map((t) => `<category>${htmlEscape(t)}</category>`).join("")}</item>`;
+  return `<item><title>${htmlEscape(item.title)}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(item.summary)}</description>${item.tags.map((t) => `<category>${htmlEscape(displayTag(t))}</category>`).join("")}</item>`;
 }
 __name(articleRssItem, "articleRssItem");
 function wrapRss(items, siteUrl2, title, link2) {
