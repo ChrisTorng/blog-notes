@@ -12091,7 +12091,7 @@ function rssXml(notes, siteUrl2, tag2 = "") {
   return wrapRss(
     notes.map((n) => noteRssItem(n, siteUrl2)),
     siteUrl2,
-    "ChrisTorng \u5B78\u7FD2\u5929\u5730 \u2014 \u96A8\u7B46" + (tag2 ? " \xB7 " + (allTags.find((t) => t.id === tag2)?.displayName || tag2) : ""),
+    (tag2 ? (allTags.find((t) => t.id === tag2)?.displayName || tag2) + " \xB7 \u96A8\u7B46 RSS" : "\u6240\u6709\u96A8\u7B46 RSS") + " | ChrisTorng \u5B78\u7FD2\u5929\u5730",
     "/notes/" + (tag2 ? "?tag=" + encodeURIComponent(tag2) : "")
   );
 }
@@ -12110,7 +12110,7 @@ function allRssXml(notes, blogItems, siteUrl2, tag2 = "") {
   return wrapRss(
     items,
     siteUrl2,
-    "ChrisTorng \u5B78\u7FD2\u5929\u5730 \u2014 " + (tag2 ? allTags.find((t) => t.id === tag2)?.displayName || tag2 : "\u5168\u90E8\u66F4\u65B0"),
+    (tag2 ? (allTags.find((t) => t.id === tag2)?.displayName || tag2) + " \xB7 \u6587\u7AE0\u8207\u96A8\u7B46 RSS" : "\u6240\u6709\u6587\u7AE0\u8207\u96A8\u7B46 RSS") + " | ChrisTorng \u5B78\u7FD2\u5929\u5730",
     tag2 ? "/tags/" + encodeURIComponent(tag2) + "/" : "/"
   );
 }
