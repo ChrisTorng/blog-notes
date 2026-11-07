@@ -20,6 +20,23 @@ export const htmlEscape = (value) =>
       "'": '&#39;',
     })[ch])
 
+
+// Public pages and RSS resolve relative links identically against the site's
+// root, never against the varying /notes/<slug>/ address.
+export function renderPublicMarkdown(input, siteUrl) {
+  const root = new URL('/', siteUrl).href
+  return renderMarkdown(input).replace(/\b(href|src)="([^"]*)"/g, (full, attribute, encoded) => {
+    try {
+      const value = encoded.replaceAll('&amp;', '&')
+      const url = new URL(value, root)
+      if (!['https:', 'http:', 'mailto:'].includes(url.protocol)) return attribute + '="#"'
+      return attribute + '="' + htmlEscape(url.href) + '"'
+    } catch {
+      return attribute + '="#"'
+    }
+  })
+}
+
 export function plainText(markdown) {
   const text = []
   function visit(tokens) {

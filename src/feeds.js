@@ -6,8 +6,8 @@ import {
   notePath,
   noteTitle,
   plainText,
-  renderMarkdown,
 } from './markdown.js'
+import { noteArticleHtml, displayTag } from './public-content.js'
 
 function isoSafe(date) {
   const result = new Date(date)
@@ -19,28 +19,19 @@ function pubDate(date) {
   return new Date(isoSafe(date)).toUTCString()
 }
 
+const cdata = html => '<![CDATA['+String(html).replaceAll(']]>',']]]]><![CDATA[>')+']]>';
 function noteRssItem(n, siteUrl) {
-  const url = `${siteUrl}${notePath(n)}`
-  return `<item><title>${htmlEscape(noteTitle(n))}</title><link>${htmlEscape(url)}</link><guid isPermaLink="true">${htmlEscape(url)}</guid><pubDate>${pubDate(n.published_at || n.created_at)}</pubDate><description>${htmlEscape(plainText(n.markdown))}</description><content:encoded>${htmlEscape(
-    renderMarkdown(n.markdown).replace(
-      /\b(href|src)="([^"]*)"/g,
-      (match, attr, value) => {
-        if (/^(?:[a-z][a-z0-9+.-]*:)/i.test(value)) return match
-        return (
-          attr +
-          '="' +
-          new URL(value.replaceAll('&amp;', '&'), url).href.replaceAll(
-            '&',
-            '&amp;'
-          ) +
-          '"'
-        )
-      }
-    )
-  )}</content:encoded>${n.tags.map((t) => `<category>${htmlEscape(t)}</category>`).join('')}</item>`
+  const url = siteUrl + notePath(n);
+  const content = noteArticleHtml(n,siteUrl);
+  const categories = n.tags.map(id=>'<category>'+htmlEscape(displayTag(id))+'</category>').join('');
+  return '<item><title>'+htmlEscape(noteTitle(n))+'</title><link>'+htmlEscape(url)+
+    '</link><guid isPermaLink="true">'+htmlEscape(url)+'</guid><pubDate>'+
+    pubDate(n.published_at || n.created_at)+'</pubDate><description>'+
+    htmlEscape(content)+'</description><content:encoded>'+cdata(content)+
+    '</content:encoded>'+categories+'</item>';
 }
 function articleRssItem(item) {
-  return `<item><title>${htmlEscape(item.title)}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(item.summary)}</description>${item.tags.map((t) => `<category>${htmlEscape(t)}</category>`).join('')}</item>`
+  return `<item><title>${htmlEscape(item.title)}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(item.summary)}</description>${item.tags.map((t) => `<category>${htmlEscape(displayTag(t))}</category>`).join('')}</item>`
 }
 function wrapRss(items, siteUrl, title, link) {
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>${htmlEscape(title)}</title><link>${htmlEscape(`${siteUrl}${link}`)}</link><description>${htmlEscape(title)}</description><language>zh-TW</language>${items.join('')}</channel></rss>`
