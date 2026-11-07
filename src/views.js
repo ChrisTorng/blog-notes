@@ -63,8 +63,9 @@ export function noteTitle(note) {
     '隨筆'
   )
 }
-export function notePath(id) {
-  return `/notes/${encodeURIComponent(id)}/`
+export function notePath(note) {
+  const key = typeof note === 'string' ? note : note.slug || note.id
+  return `/notes/${encodeURIComponent(key)}/`
 }
 export function pageHtml({
   title,
@@ -91,12 +92,12 @@ export function tagLinks(note) {
     .join(' ')
 }
 export function noteCard(note, { showTitle = true } = {}) {
-  const link = notePath(note.id)
+  const link = notePath(note)
   const date = note.published_at || note.created_at
   return `<article class="entry note" data-note-id="${htmlEscape(note.id)}"><div class="entry-meta"><time datetime="${htmlEscape(date)}">${htmlEscape(formatNoteDate(date))}</time></div>
 ${showTitle && (note.title || note.bookmark_title) ? `<h2><a class="title-link" href="${link}">${htmlEscape(note.title || note.bookmark_title)}</a></h2>` : ''}
 <div class="entry-tags">${tagLinks(note)}</div>
-${note.bookmark_id ? `<aside class="bookmark-reference"><span>參考書籤：</span><a href="/bookmarks/${encodeURIComponent(note.bookmark_id)}/">${htmlEscape(note.bookmark_title || note.bookmark_url || "書籤")}</a></aside>` : ""}
+${note.bookmark_id ? `<aside class="bookmark-reference"><span>參考書籤：</span><a href="/bookmarks/view/?id=${encodeURIComponent(note.bookmark_id)}">${htmlEscape(note.bookmark_title || note.bookmark_url || "書籤")}</a></aside>` : ""}
 <div class="prose dark:prose-invert">${renderMarkdown(note.markdown)}</div>
 </article>`
 }
@@ -122,7 +123,7 @@ export function listingPage(notes, opts) {
     createElement(ListWithCategories, {
       posts: notes.map((note) => ({
         path: note.id,
-        href: notePath(note.id),
+        href: notePath(note),
         date: note.published_at || note.created_at,
         title: noteTitle(note),
         html: renderMarkdown(note.markdown),
@@ -171,13 +172,13 @@ export function individualPage(note, siteUrl) {
     author: { '@type': 'Person', name: 'ChrisTorng' },
     datePublished: date,
     dateModified: note.updated_at,
-    mainEntityOfPage: new URL(notePath(note.id), siteUrl).href,
+    mainEntityOfPage: new URL(notePath(note), siteUrl).href,
     description: description.slice(0, 180),
   }).replace(/</g, () => String.fromCharCode(92) + 'u003c')
   return pageHtml({
     title,
     description,
-    canonical: notePath(note.id),
+    canonical: notePath(note),
     siteUrl,
     type: 'article',
     current: 'notes',
