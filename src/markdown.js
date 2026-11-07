@@ -43,7 +43,8 @@ export function noteTitle(note) {
     '隨筆'
 }
 
-export function notePath(id) {
-  return '/notes/' + encodeURIComponent(id) + '/'
+export function notePath(note) {
+  const key = typeof note === 'string' ? note : note.slug || note.id
+  return '/notes/' + encodeURIComponent(key) + '/'
 }
 
