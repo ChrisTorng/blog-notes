@@ -4,6 +4,7 @@ import {
   createNote,
   deleteNote,
   getNote,
+  getNoteBySlug,
   listNotes,
   PAGE_SIZE,
   pageNumber,
@@ -12,6 +13,7 @@ import {
 import { adminIdentity, allowedOrigin } from './auth.js'
 import { noteTitle, renderMarkdown } from './markdown.js'
 import { readLimitedText } from './http.js'
+import { publicNotePage } from './public-page.js'
 import { allRssXml, readBlogItems, rssXml, sitemapXml } from './feeds.js'
 
 // UI is a static GitHub Pages build. Worker routes serve only JSON and RSS/XML.
@@ -185,7 +187,32 @@ const worker = {
         }
         return xml(sitemapXml(notes, siteUrl(env)))
       }
-      return json({ error: '不存在的 API' }, 404)
+      if (req.method === 'GET') {
+        // Existing ID links redirect only for public notes; private editor previews
+        // retain the legacy static route and authentication checks.
+        const oldId = path === '/notes/view/' || path === '/notes/view'
+          ? url.searchParams.get('id') : null
+        if (oldId && noteSlug.test(oldId)) {
+          const existing = await getNote(env.DB, oldId)
+          if (existing?.slug)
+            return Response.redirect(url.origin + '/notes/' + encodeURIComponent(existing.slug) + '/', 308)
+        }
+        const match = path.match(/^\/notes\/([a-z0-9-]{1,100})\/?$/)
+        if (match && !['view','editor','admin','api','all','page'].includes(match[1])) {
+          const key = match[1]
+          const note = noteSlug.test(key) ? await getNote(env.DB,key) : await getNoteBySlug(env.DB,key)
+          if (note?.slug) {
+            const canonical = '/notes/' + note.slug + '/'
+            if (url.pathname !== canonical) return Response.redirect(url.origin + canonical,308)
+            return publicNotePage(req,note)
+          }
+          return json({ error: '找不到隨筆' },404)
+        }
+      }
+      // All other paths remain on the GitHub Pages static origin.
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+        return json({ error: '不存在的 API' },404)
+      return fetch(req)
     } catch (e) {
       if (e instanceof URIError) return json({ error: '網址格式無效' }, 400)
       const bad = e instanceof Error && /Markdown|Tag|tags|標題|狀態|JSON|請求|未知|Content-Type|資料/.test(e.message)

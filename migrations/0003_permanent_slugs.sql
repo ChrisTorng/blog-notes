@@ -1,0 +1,2 @@
+ALTER TABLE notes ADD COLUMN slug TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_slug ON notes(slug);

@@ -1,4 +1,6 @@
 import tagDefinitions from '../shared/tags.json' with { type: 'json' }
+import { ensureSlug } from './slug.js'
+import { noteTitle } from './markdown.js'
 
 export const PAGE_SIZE = 20
 const tagIds = new Set(tagDefinitions.map((tag) => tag.id))
@@ -39,7 +41,7 @@ export function checkNoteInput(value) {
     bookmark_id: bookmarkId, bookmark_title: bookmarkTitle, bookmark_url: bookmarkUrl }
 }
 
-const fields = `n.id, n.title, n.markdown, n.status, n.created_at, n.updated_at, n.published_at,
+const fields = `n.id, n.slug, n.title, n.markdown, n.status, n.created_at, n.updated_at, n.published_at,
   n.bookmark_id, n.bookmark_title, n.bookmark_url,
   COALESCE((SELECT json_group_array(tag_id) FROM note_tags WHERE note_id=n.id), '[]') AS tags`
 
@@ -57,6 +59,10 @@ export async function getNote(db, id, includeDraft = false) {
   return decode(row)
 }
 
+export async function getNoteBySlug(db, slug) {
+  const row = await db.prepare(`SELECT ${fields} FROM notes n WHERE n.slug=? AND n.status='published' LIMIT 1`).bind(slug).first()
+  return decode(row)
+}
 export async function listNotes(
   db,
   { page = 1, pageSize = PAGE_SIZE, tag = '', includeDraft = false } = {}
@@ -131,6 +137,8 @@ export async function createNote(db, raw) {
     )
   )
   await db.batch(statements)
+  if (input.status === 'published')
+    await ensureSlug(db, 'notes', id, noteTitle(input))
   return getNote(db, id, true)
 }
 
@@ -155,6 +163,8 @@ export async function updateNote(db, id, raw) {
     ),
   ]
   await db.batch(stmts)
+  if (input.status === 'published')
+    await ensureSlug(db, 'notes', id, noteTitle(input))
   return getNote(db, id, true)
 }
 

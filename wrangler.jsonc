@@ -30,6 +30,7 @@
   "account_id": "9cc62792ee01a8163da2a1b0cc86a55b",
   "preview_urls": false,
   "routes": [
+    { "pattern": "christorng.idv.tw/notes/*", "zone_id": "c5475506538ba09563cacc12b8acb3d0" },
     { "pattern": "christorng.idv.tw/notes/api*", "zone_id": "c5475506538ba09563cacc12b8acb3d0" },
     { "pattern": "christorng.idv.tw/notes/feed.xml*", "zone_id": "c5475506538ba09563cacc12b8acb3d0" },
     { "pattern": "christorng.idv.tw/notes/all/feed.xml*", "zone_id": "c5475506538ba09563cacc12b8acb3d0" },
