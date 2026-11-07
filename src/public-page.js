@@ -1,5 +1,5 @@
-import { htmlEscape as esc, noteTitle, plainText, renderPublicMarkdown } from './markdown.js';
-import { allTags } from './data.js';
+import { htmlEscape as esc, noteTitle, plainText } from './markdown.js';
+import { noteArticleHtml } from './public-content.js';
 
 export async function publicNotePage(request, note) {
   const site = 'ChrisTorng 學習天地';
@@ -7,20 +7,8 @@ export async function publicNotePage(request, note) {
   const canonical = origin + '/notes/' + encodeURIComponent(note.slug) + '/';
   const title = noteTitle(note);
   const text = plainText(note.markdown).slice(0, 180);
-  const date = (note.published_at || note.created_at).slice(0, 10);
-  const names = new Map(allTags.map(tag=>[tag.id,tag.displayName]));
-  const tags = note.tags.map(id=>'<a class="text-primary-500" href="/notes/?tag='+
-    encodeURIComponent(id)+'">#'+esc(names.get(id)||id)+'</a>').join('');
-  const markdown = renderPublicMarkdown(note.markdown,origin);
-  const bookmarkLink = note.bookmark_id
-    ? '<a class="text-primary-500 mt-3 inline-block text-sm" href="/bookmarks/view/?id=' +
-      encodeURIComponent(note.bookmark_id)+'">參考書籤 ↗</a>' : '';
   const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">← 隨筆列表</a>'+
-    '<article class="mt-4 border-b border-gray-300/40 py-4 dark:border-gray-700">'+
-    '<time class="text-xs text-gray-500" datetime="'+esc(date)+'">'+esc(date)+'</time>'+
-    '<h1 class="mt-2 text-xl leading-snug font-bold">'+esc(title)+'</h1>'+
-    '<div class="mt-3 prose max-w-none text-sm dark:prose-invert">'+markdown+'</div>'+
-    bookmarkLink+'<div class="mt-3 flex flex-wrap gap-2 text-sm">'+tags+'</div></article></section>';
+    '<div class="mt-4">'+noteArticleHtml(note,origin)+'</div></section>';
   const jsonld = JSON.stringify({
     '@context':'https://schema.org','@type':'BlogPosting',
     headline:title,datePublished:note.published_at||note.created_at,
