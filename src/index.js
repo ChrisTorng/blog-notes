@@ -210,6 +210,8 @@ const worker = {
         }
       }
       // All other paths remain on the GitHub Pages static origin.
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+        return json({ error: '不存在的 API' },404)
       return fetch(req)
     } catch (e) {
       if (e instanceof URIError) return json({ error: '網址格式無效' }, 400)
