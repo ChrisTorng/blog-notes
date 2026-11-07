@@ -80,7 +80,7 @@ export function pageHtml({
 }) {
   const url = canonical ? new URL(canonical, siteUrl).href : `${siteUrl}/notes/`
   const desc = String(description || 'ChrisTorng 學習天地的隨筆').slice(0, 180)
-  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${htmlEscape(title)} | ChrisTorng 學習天地</title><meta name="description" content="${htmlEscape(desc)}"><meta name="robots" content="${robots}"><link rel="canonical" href="${htmlEscape(url)}"><meta property="og:type" content="${type}"><meta property="og:title" content="${htmlEscape(title)}"><meta property="og:description" content="${htmlEscape(desc)}"><meta property="og:url" content="${htmlEscape(url)}">${feed ? '<link rel="alternate" type="application/rss+xml" title="隨筆 RSS" href="/notes/feed.xml">' : ''}${head}</head><body><main>${body}</main></body></html>`
+  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${htmlEscape(title)} | ChrisTorng 學習天地</title><meta name="description" content="${htmlEscape(desc)}"><meta name="robots" content="${robots}"><link rel="canonical" href="${htmlEscape(url)}"><meta property="og:type" content="${type}"><meta property="og:title" content="${htmlEscape(title)}"><meta property="og:description" content="${htmlEscape(desc)}"><meta property="og:url" content="${htmlEscape(url)}">${feed ? '<link rel="alternate" type="application/rss+xml" title="所有隨筆 RSS | ChrisTorng 學習天地" href="/notes/feed.xml">' : ''}${head}</head><body><main>${body}</main></body></html>`
 }
 export function tagLinks(note) {
   return (note.tags || [])
@@ -110,7 +110,7 @@ export function pager(base, page, pages, tag = '') {
 }
 export function listingPage(notes, opts) {
   const { page, pages, tag = '', siteUrl, tagCounts = {} } = opts
-  const filtered = tag ? ' · ' + (names.get(tag) || tag) : ''
+  const title = tag ? (names.get(tag) || tag) + ' · 隨筆' : '隨筆'
   const categories = allTags.map((t) => ({
     ...t,
     count: tagCounts[t.id] || 0,
@@ -129,14 +129,14 @@ export function listingPage(notes, opts) {
         tags: note.tags.map((t) => names.get(t) || t),
         noteId: note.id,
       })),
-      title: '隨筆' + filtered,
+      title,
       categories,
       activeTag: tag,
       rootHref: '/notes/',
       rootLabel: '所有隨筆',
       rootActive: !tag,
       rssHref: feedPath,
-      rssTitle: '隨筆' + filtered + ' RSS',
+      rssTitle: tag ? title + ' RSS' : '所有隨筆 RSS',
       pagination: {
         totalPages: pages,
         currentPage: page,
@@ -149,7 +149,7 @@ export function listingPage(notes, opts) {
     })
   )
   return pageHtml({
-    title: '隨筆' + filtered,
+    title,
     description: 'ChrisTorng 的近期隨筆、技術觀察與學習心得',
     canonical:
       '/notes/' +

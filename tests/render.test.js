@@ -132,3 +132,11 @@ test('Notes always render the complete Markdown through the end, including long 
     assert.equal((html.match(/完整內文。/g) || []).length >= 2000, true)
   }
 })
+
+test('RSS channel titles match the public section and use the HTML title separator', () => {
+ const base = 'https://example.org'
+ assert.ok(rssXml([note], base).includes('<title>所有隨筆 RSS | ChrisTorng 學習天地</title>'))
+ assert.ok(rssXml([note], base, 'ai').includes('<title>AI · 隨筆 RSS | ChrisTorng 學習天地</title>'))
+ assert.ok(allRssXml([note], [], base).includes('<title>所有文章與隨筆 RSS | ChrisTorng 學習天地</title>'))
+ assert.ok(allRssXml([note], [], base, 'ai').includes('<title>AI · 文章與隨筆 RSS | ChrisTorng 學習天地</title>'))
+})
