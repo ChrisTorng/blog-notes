@@ -20,7 +20,7 @@ function pubDate(date) {
 }
 
 function noteRssItem(n, siteUrl) {
-  const url = `${siteUrl}${notePath(n.id)}`
+  const url = `${siteUrl}${notePath(n)}`
   return `<item><title>${htmlEscape(noteTitle(n))}</title><link>${htmlEscape(url)}</link><guid isPermaLink="true">${htmlEscape(url)}</guid><pubDate>${pubDate(n.published_at || n.created_at)}</pubDate><description>${htmlEscape(plainText(n.markdown))}</description><content:encoded>${htmlEscape(
     renderMarkdown(n.markdown).replace(
       /\b(href|src)="([^"]*)"/g,
@@ -79,7 +79,7 @@ export function allRssXml(notes, blogItems, siteUrl, tag = '') {
 export function sitemapXml(notes, siteUrl) {
   const urls = [
     `${siteUrl}/notes/`,
-    ...notes.map((n) => `${siteUrl}${notePath(n.id)}`),
+    ...notes.map((n) => `${siteUrl}${notePath(n)}`),
   ]
   return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((url, i) => `<url><loc>${htmlEscape(url)}</loc>${i ? `<lastmod>${isoSafe(notes[i - 1].updated_at)}</lastmod>` : ''}</url>`).join('')}</urlset>`
 }
