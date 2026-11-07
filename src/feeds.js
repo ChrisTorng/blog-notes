@@ -49,10 +49,7 @@ export function rssXml(notes, siteUrl, tag = '') {
   return wrapRss(
     notes.map((n) => noteRssItem(n, siteUrl)),
     siteUrl,
-    'ChrisTorng 學習天地 — 隨筆' +
-      (tag
-        ? ' · ' + (allTags.find((t) => t.id === tag)?.displayName || tag)
-        : ''),
+    (tag ? (allTags.find((t) => t.id === tag)?.displayName || tag) + ' · 隨筆 RSS' : '所有隨筆 RSS') + ' | ChrisTorng 學習天地',
     '/notes/' + (tag ? '?tag=' + encodeURIComponent(tag) : '')
   )
 }
@@ -75,10 +72,7 @@ export function allRssXml(notes, blogItems, siteUrl, tag = '') {
   return wrapRss(
     items,
     siteUrl,
-    'ChrisTorng 學習天地 — ' +
-      (tag
-        ? allTags.find((t) => t.id === tag)?.displayName || tag
-        : '全部更新'),
+    (tag ? (allTags.find((t) => t.id === tag)?.displayName || tag) + ' · 文章與隨筆 RSS' : '所有文章與隨筆 RSS') + ' | ChrisTorng 學習天地',
     tag ? '/tags/' + encodeURIComponent(tag) + '/' : '/'
   )
 }
