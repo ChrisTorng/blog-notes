@@ -29,16 +29,12 @@ export function checkNoteInput(value) {
   if (!['draft', 'published'].includes(status))
     throw new Error('狀態必須是 draft 或 published')
   const bookmarkId = value.bookmark_id || null
-  const bookmarkTitle = value.bookmark_title || null
-  const bookmarkUrl = value.bookmark_url || null
   if (bookmarkId && !/^[0-9a-f-]{36}$/.test(bookmarkId))
     throw new Error('書籤 ID 格式無效')
-  if (bookmarkUrl && !/^https?:\/\//.test(bookmarkUrl))
-    throw new Error('書籤網址格式無效')
-  if ((bookmarkTitle && !bookmarkId) || (bookmarkUrl && !bookmarkId))
-    throw new Error('缺少書籤 ID')
+  // Only the reference ID is authoritative; never persist snapshots of the
+  // linked bookmark title, URL, or summary. Older columns remain for migration.
   return { title, markdown, status, tags: cleanTags(value.tags ?? []),
-    bookmark_id: bookmarkId, bookmark_title: bookmarkTitle, bookmark_url: bookmarkUrl }
+    bookmark_id: bookmarkId, bookmark_title: null, bookmark_url: null }
 }
 
 const fields = `n.id, n.slug, n.title, n.markdown, n.status, n.created_at, n.updated_at, n.published_at,

@@ -4,6 +4,7 @@
   "main": "src/index.js",
   "compatibility_date": "2026-10-27",
   "workers_dev": false,
+  "services": [{"binding": "BOOKMARKS", "service": "blog-bookmarks"}],
   "d1_databases": [
     {
       "binding": "DB",

@@ -14,6 +14,7 @@ import { adminIdentity, allowedOrigin } from './auth.js'
 import { noteTitle, renderMarkdown } from './markdown.js'
 import { readLimitedText } from './http.js'
 import { publicNotePage } from './public-page.js'
+import { bookmarkEmbeds } from './bookmark-embed.js'
 import { allRssXml, readBlogItems, rssXml, sitemapXml } from './feeds.js'
 
 // UI is a static GitHub Pages build. Worker routes serve only JSON and RSS/XML.
@@ -36,6 +37,7 @@ const xml = (body, mime = 'application/xml') =>
   })
 const siteUrl = (env) => (env.SITE_URL || 'https://christorng.idv.tw').replace(/\/$/, '')
 const noteSlug = /^[0-9]{8}-[a-f0-9]{10}$/
+
 
 async function readPayload(req) {
   if (!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))
@@ -166,7 +168,8 @@ const worker = {
       if (path === '/notes/feed.xml' && req.method === 'GET') {
         const tag = url.searchParams.get('tag') || ''
         const data = await listNotes(env.DB, { pageSize: 100, tag })
-        return xml(rssXml(data.items, siteUrl(env), tag), 'application/rss+xml')
+        const embeds = await bookmarkEmbeds(data.items, env, siteUrl(env))
+        return xml(rssXml(data.items, siteUrl(env), tag, embeds), 'application/rss+xml')
       }
       if (path === '/notes/all/feed.xml' && req.method === 'GET') {
         const tag = url.searchParams.get('tag') || ''
@@ -176,7 +179,8 @@ const worker = {
         ])
         if (blogs.error && !blogs.items.length)
           return new Response(blogs.error, { status: 503, headers: { 'Retry-After': '60' } })
-        return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag), 'application/rss+xml')
+        const embeds = await bookmarkEmbeds(notes.items, env, siteUrl(env))
+        return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag, embeds), 'application/rss+xml')
       }
       if (path === '/notes/sitemap.xml' && req.method === 'GET') {
         const total = (await listNotes(env.DB, { pageSize: 1 })).total
@@ -204,7 +208,8 @@ const worker = {
           if (note?.slug) {
             const canonical = '/notes/' + note.slug + '/'
             if (url.pathname !== canonical) return Response.redirect(url.origin + canonical,308)
-            return publicNotePage(req,note)
+            const embeds = await bookmarkEmbeds([note], env, url.origin)
+            return publicNotePage(req,note,embeds[note.bookmark_id] || '')
           }
           return json({ error: '找不到隨筆' },404)
         }

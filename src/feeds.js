@@ -20,9 +20,9 @@ function pubDate(date) {
 }
 
 const cdata = html => '<![CDATA['+String(html).replaceAll(']]>',']]]]><![CDATA[>')+']]>';
-function noteRssItem(n, siteUrl) {
+function noteRssItem(n, siteUrl, bookmarkHtmlById = {}) {
   const url = siteUrl + notePath(n);
-  const content = noteArticleHtml(n,siteUrl);
+  const content = noteArticleHtml(n,siteUrl,bookmarkHtmlById[n.bookmark_id] || '');
   const categories = n.tags.map(id=>'<category>'+htmlEscape(displayTag(id))+'</category>').join('');
   return '<item><title>'+htmlEscape(noteTitle(n))+'</title><link>'+htmlEscape(url)+
     '</link><guid isPermaLink="true">'+htmlEscape(url)+'</guid><pubDate>'+
@@ -36,15 +36,15 @@ function articleRssItem(item) {
 function wrapRss(items, siteUrl, title, link) {
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>${htmlEscape(title)}</title><link>${htmlEscape(`${siteUrl}${link}`)}</link><description>${htmlEscape(title)}</description><language>zh-TW</language>${items.join('')}</channel></rss>`
 }
-export function rssXml(notes, siteUrl, tag = '') {
+export function rssXml(notes, siteUrl, tag = '', bookmarkHtmlById = {}) {
   return wrapRss(
-    notes.map((n) => noteRssItem(n, siteUrl)),
+    notes.map((n) => noteRssItem(n, siteUrl, bookmarkHtmlById)),
     siteUrl,
     (tag ? (allTags.find((t) => t.id === tag)?.displayName || tag) + ' · 隨筆 RSS' : '所有隨筆 RSS') + ' | ChrisTorng 學習天地',
     '/notes/' + (tag ? '?tag=' + encodeURIComponent(tag) : '')
   )
 }
-export function allRssXml(notes, blogItems, siteUrl, tag = '') {
+export function allRssXml(notes, blogItems, siteUrl, tag = '', bookmarkHtmlById = {}) {
   const items = [
     ...notes.map((note) => ({
       kind: 'note',
@@ -57,7 +57,7 @@ export function allRssXml(notes, blogItems, siteUrl, tag = '') {
     .slice(0, 100)
     .map((item) =>
       item.kind === 'note'
-        ? noteRssItem(item.note, siteUrl)
+        ? noteRssItem(item.note, siteUrl, bookmarkHtmlById)
         : articleRssItem(item)
     )
   return wrapRss(
