@@ -28,7 +28,7 @@ test('Notes public page, own RSS and combined RSS use identical complete HTML',(
   assert.ok(html.includes('<a href="https://example.org/blog/example/">文章</a>'))
   assert.ok(html.includes('<img src="https://example.org/picture.png"'))
   assert.ok(html.includes('<strong>重點</strong>'))
-  assert.ok(html.includes('參考書籤'))
+  assert.ok(html.includes('引用書籤'))
   assert.ok(html.includes('/bookmarks/view/?id='))
   assert.ok(html.includes('#AI'))
   assert.ok(!html.includes('<script>'))
