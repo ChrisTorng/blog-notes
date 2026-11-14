@@ -76,9 +76,13 @@ export default function DraftTimeline({ articles }: { articles: Entry[] }) {
     load().catch((error) => {
       if (!controller.signal.aborted) {
         setLoadError(true)
-        setNotice(error instanceof TypeError
-          ? '無法連接隨筆管理 API；可能尚未登入 Cloudflare Access，或登入頁轉址被瀏覽器封鎖。'
-          : error instanceof Error ? error.message : '隨筆草稿載入失敗。')
+        setNotice(
+          error instanceof TypeError
+            ? '無法連接隨筆管理 API；可能尚未登入 Cloudflare Access，或登入頁轉址被瀏覽器封鎖。'
+            : error instanceof Error
+              ? error.message
+              : '隨筆草稿載入失敗。'
+        )
       }
     })
     return () => controller.abort()
@@ -110,20 +114,32 @@ export default function DraftTimeline({ articles }: { articles: Entry[] }) {
           />
         </label>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          <Link href="/notes/editor/" target="_blank" rel="noopener noreferrer"
-            className="text-primary-500 hover:text-primary-600">
+          <Link
+            href="/notes/editor/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary-500 hover:text-primary-600"
+          >
             開啟隨筆編輯器（新增／登入）
           </Link>
           {loadError && (
-            <button type="button" className="text-primary-500 underline"
-              onClick={() => { setNotice('正在重新讀取隨筆草稿……'); setRetry((n) => n + 1) }}>
+            <button
+              type="button"
+              className="text-primary-500 underline"
+              onClick={() => {
+                setNotice('正在重新讀取隨筆草稿……')
+                setRetry((n) => n + 1)
+              }}
+            >
               重新載入草稿
             </button>
           )}
         </div>
-        {notice && <p role="status" className="text-sm text-gray-500 dark:text-gray-400">
-          {notice}
-        </p>}
+        {notice && (
+          <p role="status" className="text-sm text-gray-500 dark:text-gray-400">
+            {notice}
+          </p>
+        )}
       </div>
       <ul className="divide-y divide-gray-200 dark:divide-gray-700">
         {entries.map((entry) => (
