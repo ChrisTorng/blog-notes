@@ -14,6 +14,7 @@ import { adminIdentity, allowedOrigin } from './auth.js'
 import { noteTitle, renderMarkdown } from './markdown.js'
 import { readLimitedText } from './http.js'
 import { publicNotePage } from './public-page.js'
+import { bookmarkEmbeds } from './bookmark-embed.js'
 import { allRssXml, readBlogItems, rssXml, sitemapXml } from './feeds.js'
 
 // UI is a static GitHub Pages build. Worker routes serve only JSON and RSS/XML.
@@ -37,30 +38,6 @@ const xml = (body, mime = 'application/xml') =>
 const siteUrl = (env) => (env.SITE_URL || 'https://christorng.idv.tw').replace(/\/$/, '')
 const noteSlug = /^[0-9]{8}-[a-f0-9]{10}$/
 
-const bookmarkIdPattern = /^[0-9a-f-]{36}$/
-// The service binding calls Bookmarks' public canonical HTML API directly.
-// No stored snapshot or custom HTML renderer is kept by Notes.
-async function bookmarkEmbeds(notes, env, origin) {
-  const ids = [...new Set(notes.map(note => note.bookmark_id)
-    .filter(id => id && bookmarkIdPattern.test(id)))]
-  if (!ids.length) return {}
-  if (!env.BOOKMARKS) throw new Error('BOOKMARKS service binding is missing')
-  const results = await Promise.all(ids.map(async id => {
-    const response = await env.BOOKMARKS.fetch(
-      new Request('https://bookmarks.internal/bookmarks/api/embed/' + id,
-        {headers: {'Accept': 'text/html'}})
-    )
-    if (response.status === 404)
-      return [id, '<p class="text-sm text-gray-500">引用書籤目前未公開或已移除。</p>']
-    if (!response.ok) throw new Error('Cannot load referenced bookmark: ' + response.status)
-    // RSS readers do not necessarily resolve relative paths against our website.
-    const html = (await response.text()).replace(
-      /\b(href|src)="\/(?!\/)/g, (match, attribute) => attribute + '="' + origin + '/'
-    )
-    return [id, html]
-  }))
-  return Object.fromEntries(results)
-}
 
 async function readPayload(req) {
   if (!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))
