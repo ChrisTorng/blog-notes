@@ -35,8 +35,6 @@ function values(status = state.status) {
       (el) => el.value
     ),
     bookmark_id: bookmarkRef?.id || null,
-    bookmark_title: bookmarkRef?.title || null,
-    bookmark_url: bookmarkRef?.url || null,
   }
 }
 function dirty() {
@@ -144,8 +142,33 @@ async function preview() {
       previewRequest.signal
     )
     if (version !== state.preview) return
+    if (version !== state.preview) return
     $('previewTitle').textContent = result.title
-    $('preview').innerHTML = result.html // Server disables raw HTML and unsafe links.
+    const pane = $('preview')
+    pane.replaceChildren()
+    if (bookmarkRef?.id) {
+      const frame = document.createElement('aside')
+      frame.className = 'bookmark-embed'
+      frame.setAttribute('aria-label', '引用書籤')
+      try {
+        const response = await fetch(
+          '/bookmarks/api/embed/' + encodeURIComponent(bookmarkRef.id),
+          {signal: previewRequest.signal, cache: 'no-store'}
+        )
+        if (!response.ok) throw new Error('引用書籤未公開、已移除或暫時無法讀取')
+        const content = document.createElement('div')
+        content.innerHTML = await response.text() // Bookmarks API renders sanitized public HTML.
+        if (version !== state.preview) return
+        frame.append(content)
+      } catch (error) {
+        if (error.name === 'AbortError' || version !== state.preview) return
+        frame.textContent = error.message
+      }
+      pane.append(frame)
+    }
+    const text = document.createElement('div')
+    text.innerHTML = result.html // Notes API disables raw HTML and unsafe links.
+    pane.append(text);
   } catch (error) {
     if (error.name !== 'AbortError' && version === state.preview)
       notice(error.message, true)
@@ -166,9 +189,10 @@ function updateBookmarkRef() {
   node.replaceChildren()
   if (!bookmarkRef) return
   const link = document.createElement('a')
-  link.href = '/bookmarks/' + encodeURIComponent(bookmarkRef.id) + '/'
+  link.href = '/bookmarks/view/?id=' + encodeURIComponent(bookmarkRef.id)
   link.target = '_blank'
-  link.textContent = '來源書籤：' + (bookmarkRef.title || bookmarkRef.url)
+  link.rel = 'noopener noreferrer'
+  link.textContent = '引用書籤：' + (bookmarkRef.title || '查看書籤')
   node.append(link)
 }
 function load(item = {}) {
@@ -251,35 +275,22 @@ async function refreshList() {
 async function loadBookmarkIfRequested() {
   if (!pendingBookmark || state.id || bookmarkRef) return
   if (!/^[0-9a-f-]{36}$/.test(pendingBookmark)) return
-  const headers = {}
-  if (local) {
-    const token = sessionStorage.getItem('blog-bookmarks-admin-token')
-    if (token) headers.Authorization = 'Bearer ' + token
+  try {
+    // A public Bookmarks API is sufficient; no second admin session is required.
+    const response = await fetch('/bookmarks/api/' + pendingBookmark, {
+      credentials: 'same-origin', cache: 'no-store'
+    })
+    if (!response.ok) throw new Error('引用的書籤尚未公開或不存在')
+    const item = await response.json()
+    if (!item?.id || item.status < 3) throw new Error('請先公開書籤，再建立隨筆')
+    bookmarkRef = { id: item.id, title: item.title }
+    updateBookmarkRef()
+    schedulePreview()
+    notice('已引用書籤；只儲存書籤 ID，請填寫心得。')
+    $('markdown').focus()
+  } catch (error) {
+    notice(error.message, true)
   }
-  const response = await fetch('/bookmarks/api/admin/' + pendingBookmark, {
-    headers, credentials:'same-origin', cache:'no-store'
-  })
-  if (!response.ok) {
-    notice('無法取得來源書籤，請先登入 Bookmarks 管理後台', true)
-    return
-  }
-  const item = await response.json()
-  if (!item?.id || item.status < 3) {
-    notice('請先公開此書籤，再建立隨筆', true)
-    return
-  }
-  bookmarkRef = {id:item.id,title:item.title,url:item.url}
-  if (!$('title').value.trim()) $('title').value = item.title.slice(0,160)
-  if (!$('markdown').value.trim()) {
-    const safeTitle = item.title.replaceAll('\\', '\\\\').replaceAll('[', '\\[').replaceAll(']', '\\]')
-    const safeUrl = item.url.replaceAll('<','%3C').replaceAll('>','%3E')
-    $('markdown').value = '[' + safeTitle + '](<' + safeUrl + '>)' +
-      (item.summary?.trim() ? '\n\n' + item.summary.trim() : '') + '\n\n'
-  }
-  updateBookmarkRef()
-  remember()
-  schedulePreview()
-  notice('已帶入原文連結與摘要，可直接編輯')
 }
 async function login() {
   if (local) {
@@ -292,7 +303,7 @@ async function login() {
     if (state.pendingId) await openNote(state.pendingId)
     else await loadBookmarkIfRequested()
     await preview()
-    notice('已登入')
+    if (!pendingBookmark) notice('已登入')
   } catch (error) {
     state.authorized = false
     $('exportNotes').disabled = true
@@ -428,7 +439,7 @@ window.addEventListener('beforeunload', (event) => {
 load()
 try {
   const prior = JSON.parse(sessionStorage.getItem(draftKey) || 'null')
-  if (prior && (!state.pendingId || state.pendingId === prior.id)) {
+  if (prior && !pendingBookmark && (!state.pendingId || state.pendingId === prior.id)) {
     state.id = prior.id
     load(prior.entry)
     state.baseline = prior.baseline || editableSnapshot(empty)
