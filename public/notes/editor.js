@@ -142,7 +142,6 @@ async function preview() {
       previewRequest.signal
     )
     if (version !== state.preview) return
-    if (version !== state.preview) return
     $('previewTitle').textContent = result.title
     const pane = $('preview')
     pane.replaceChildren()
@@ -151,13 +150,14 @@ async function preview() {
       frame.className = 'bookmark-embed'
       frame.setAttribute('aria-label', '引用書籤')
       try {
-        const response = await fetch(
-          '/bookmarks/api/embed/' + encodeURIComponent(bookmarkRef.id),
-          {signal: previewRequest.signal, cache: 'no-store'}
+        const bookmark = await api(
+          '/notes/api/admin/bookmarks/' + encodeURIComponent(bookmarkRef.id),
+          'GET',
+          undefined,
+          previewRequest.signal
         )
-        if (!response.ok) throw new Error('引用書籤未公開、已移除或暫時無法讀取')
         const content = document.createElement('div')
-        content.innerHTML = await response.text() // Bookmarks API renders sanitized public HTML.
+        content.innerHTML = bookmark.html
         if (version !== state.preview) return
         frame.append(content)
       } catch (error) {
@@ -276,14 +276,8 @@ async function loadBookmarkIfRequested() {
   if (!pendingBookmark || state.id || bookmarkRef) return
   if (!/^[0-9a-f-]{36}$/.test(pendingBookmark)) return
   try {
-    // A public Bookmarks API is sufficient; no second admin session is required.
-    const response = await fetch('/bookmarks/api/' + pendingBookmark, {
-      credentials: 'same-origin', cache: 'no-store'
-    })
-    if (!response.ok) throw new Error('引用的書籤尚未公開或不存在')
-    const item = await response.json()
-    if (!item?.id || item.status < 3) throw new Error('請先公開書籤，再建立隨筆')
-    bookmarkRef = { id: item.id }
+    await api('/notes/api/admin/bookmarks/' + pendingBookmark)
+    bookmarkRef = { id: pendingBookmark }
     updateBookmarkRef()
     schedulePreview()
     notice('已引用書籤；只儲存書籤 ID，請填寫心得。')
