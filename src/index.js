@@ -55,7 +55,7 @@ async function bookmarkEmbeds(notes, env, origin) {
     if (!response.ok) throw new Error('Cannot load referenced bookmark: ' + response.status)
     // RSS readers do not necessarily resolve relative paths against our website.
     const html = (await response.text()).replace(
-      /\\b(href|src)="\/(?!\/)/g, (match, attribute) => attribute + '="' + origin + '/'
+      /\b(href|src)="\/(?!\/)/g, (match, attribute) => attribute + '="' + origin + '/'
     )
     return [id, html]
   }))
