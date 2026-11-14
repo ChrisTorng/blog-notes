@@ -32339,6 +32339,18 @@ function notesExport(db) {
 }
 __name(notesExport, "notesExport");
 
+// src/bookmark-publication.js
+async function ensurePublishedBookmark(env, raw) {
+  const input = checkNoteInput(raw);
+  if (input.status !== "published" || !input.bookmark_id) return;
+  if (!env.BOOKMARK_EDITOR)
+    throw new Error("\u5F15\u7528\u66F8\u7C64\u670D\u52D9\u672A\u8A2D\u5B9A\uFF0C\u7121\u6CD5\u767C\u4F48\u96A8\u7B46");
+  const result = await env.BOOKMARK_EDITOR.recommendForPublishedNote(input.bookmark_id);
+  if (!result || result.status !== 4)
+    throw new Error("\u5F15\u7528\u66F8\u7C64\u672A\u6210\u529F\u63A8\u85A6\uFF0C\u96A8\u7B46\u672A\u767C\u4F48");
+}
+__name(ensurePublishedBookmark, "ensurePublishedBookmark");
+
 // node_modules/jose/dist/webapi/lib/buffer_utils.js
 var encoder = new TextEncoder();
 var decoder = new TextDecoder();
@@ -37723,7 +37735,11 @@ async function adminApi(req, env, url, path) {
       pageSize: 100,
       page: pageNumber(url.searchParams.get("page"))
     }));
-    if (req.method === "POST") return json(await createNote(env.DB, await readPayload(req)), 201);
+    if (req.method === "POST") {
+      const raw = await readPayload(req);
+      await ensurePublishedBookmark(env, raw);
+      return json(await createNote(env.DB, raw), 201);
+    }
   }
   const found = path.match(/^\/notes\/api\/admin\/([^/]+)\/?$/);
   if (found && noteSlug.test(found[1])) {
@@ -37732,7 +37748,11 @@ async function adminApi(req, env, url, path) {
       return item ? json(item) : json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
     }
     if (req.method === "PUT") {
-      const item = await updateNote(env.DB, found[1], await readPayload(req));
+      if (!await getNote(env.DB, found[1], true))
+        return json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
+      const raw = await readPayload(req);
+      await ensurePublishedBookmark(env, raw);
+      const item = await updateNote(env.DB, found[1], raw);
       return item ? json(item) : json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
     }
     if (req.method === "DELETE") {
@@ -37868,7 +37888,7 @@ var worker = {
       return fetch(req);
     } catch (e) {
       if (e instanceof URIError) return json({ error: "\u7DB2\u5740\u683C\u5F0F\u7121\u6548" }, 400);
-      const bad = e instanceof Error && /Markdown|Tag|tags|標題|狀態|JSON|請求|未知|Content-Type|資料/.test(e.message);
+      const bad = e instanceof Error && /Markdown|Tag|tags|標題|狀態|JSON|請求|未知|Content-Type|資料|引用書籤|分類|AI/.test(e.message);
       return json({ error: bad ? e.message : "\u4F3A\u670D\u5668\u5167\u90E8\u932F\u8AA4" }, bad ? 400 : 500);
     }
   }
