@@ -10,6 +10,7 @@ import {
   pageNumber,
   updateNote,
 } from './data.js'
+import { ensurePublishedBookmark } from './bookmark-publication.js'
 import { adminIdentity, allowedOrigin } from './auth.js'
 import { noteTitle, renderMarkdown } from './markdown.js'
 import { readLimitedText } from './http.js'
@@ -79,7 +80,11 @@ async function adminApi(req, env, url, path) {
       pageSize: 100,
       page: pageNumber(url.searchParams.get('page')),
     }))
-    if (req.method === 'POST') return json(await createNote(env.DB, await readPayload(req)), 201)
+    if (req.method === 'POST') {
+      const raw = await readPayload(req)
+      await ensurePublishedBookmark(env, raw)
+      return json(await createNote(env.DB, raw), 201)
+    }
   }
   const found = path.match(/^\/notes\/api\/admin\/([^/]+)\/?$/)
   if (found && noteSlug.test(found[1])) {
@@ -88,7 +93,12 @@ async function adminApi(req, env, url, path) {
       return item ? json(item) : json({ error: '找不到資料' }, 404)
     }
     if (req.method === 'PUT') {
-      const item = await updateNote(env.DB, found[1], await readPayload(req))
+      // Avoid recommending a bookmark when the requested Note does not exist.
+      if (!await getNote(env.DB, found[1], true))
+        return json({ error: '找不到資料' }, 404)
+      const raw = await readPayload(req)
+      await ensurePublishedBookmark(env, raw)
+      const item = await updateNote(env.DB, found[1], raw)
       return item ? json(item) : json({ error: '找不到資料' }, 404)
     }
     if (req.method === 'DELETE') {
@@ -225,7 +235,7 @@ const worker = {
       return fetch(req)
     } catch (e) {
       if (e instanceof URIError) return json({ error: '網址格式無效' }, 400)
-      const bad = e instanceof Error && /Markdown|Tag|tags|標題|狀態|JSON|請求|未知|Content-Type|資料/.test(e.message)
+      const bad = e instanceof Error && /Markdown|Tag|tags|標題|狀態|JSON|請求|未知|Content-Type|資料|引用書籤|分類|AI/.test(e.message)
       return json({ error: bad ? e.message : '伺服器內部錯誤' }, bad ? 400 : 500)
     }
   },
