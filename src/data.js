@@ -45,6 +45,20 @@ function decode(note) {
   return note ? { ...note, tags: JSON.parse(note.tags || '[]') } : null
 }
 
+export async function hasBookmarkReference(db, id) {
+  return Boolean(await db.prepare('SELECT 1 FROM notes WHERE bookmark_id=? LIMIT 1').bind(id).first())
+}
+
+export async function publishedNotesByBookmark(db, ids) {
+  if (!ids.length) return []
+  const placeholders = ids.map(() => '?').join(',')
+  const rows = await db.prepare(
+    `SELECT ${fields} FROM notes n WHERE n.status='published' AND n.bookmark_id IN (${placeholders})
+     ORDER BY n.published_at DESC, n.id DESC`
+  ).bind(...ids).all()
+  return rows.results.map(decode)
+}
+
 export async function getNote(db, id, includeDraft = false) {
   const row = await db
     .prepare(

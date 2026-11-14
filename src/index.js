@@ -27,11 +27,11 @@ const json = (data, status = 200) =>
       'X-Content-Type-Options': 'nosniff',
     },
   })
-const xml = (body, mime = 'application/xml') =>
+const xml = (body, mime = 'application/xml', hasReferences = false) =>
   new Response(body, {
     headers: {
       'Content-Type': mime + '; charset=utf-8',
-      'Cache-Control': 'public, max-age=60',
+      'Cache-Control': hasReferences ? 'no-store' : 'public, max-age=60',
       'X-Content-Type-Options': 'nosniff',
     },
   })
@@ -59,6 +59,11 @@ async function adminApi(req, env, url, path) {
     return notesExport(env.DB)
   if (path === '/notes/api/admin/whoami' && req.method === 'GET')
     return json(identity)
+  const bookmark = path.match(/^\/notes\/api\/admin\/bookmarks\/([0-9a-f-]{36})$/)
+  if (bookmark && req.method === 'GET') {
+    const html = await env.BOOKMARK_EDITOR.previewBookmark(bookmark[1])
+    return html ? json({ html }) : json({ error: '引用的書籤不存在' }, 404)
+  }
   if (path === '/notes/api/admin/preview' && req.method === 'POST') {
     const data = await readPayload(req)
     if (typeof data.markdown !== 'string' || data.markdown.length > 30000)
@@ -169,7 +174,7 @@ const worker = {
         const tag = url.searchParams.get('tag') || ''
         const data = await listNotes(env.DB, { pageSize: 100, tag })
         const embeds = await bookmarkEmbeds(data.items, env, siteUrl(env))
-        return xml(rssXml(data.items, siteUrl(env), tag, embeds), 'application/rss+xml')
+        return xml(rssXml(data.items, siteUrl(env), tag, embeds), 'application/rss+xml', Object.keys(embeds).length > 0)
       }
       if (path === '/notes/all/feed.xml' && req.method === 'GET') {
         const tag = url.searchParams.get('tag') || ''
@@ -180,7 +185,7 @@ const worker = {
         if (blogs.error && !blogs.items.length)
           return new Response(blogs.error, { status: 503, headers: { 'Retry-After': '60' } })
         const embeds = await bookmarkEmbeds(notes.items, env, siteUrl(env))
-        return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag, embeds), 'application/rss+xml')
+        return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag, embeds), 'application/rss+xml', Object.keys(embeds).length > 0)
       }
       if (path === '/notes/sitemap.xml' && req.method === 'GET') {
         const total = (await listNotes(env.DB, { pageSize: 1 })).total
