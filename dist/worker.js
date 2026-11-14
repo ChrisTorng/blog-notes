@@ -32096,22 +32096,16 @@ function checkNoteInput(value) {
   if (!["draft", "published"].includes(status))
     throw new Error("\u72C0\u614B\u5FC5\u9808\u662F draft \u6216 published");
   const bookmarkId = value.bookmark_id || null;
-  const bookmarkTitle = value.bookmark_title || null;
-  const bookmarkUrl = value.bookmark_url || null;
   if (bookmarkId && !/^[0-9a-f-]{36}$/.test(bookmarkId))
     throw new Error("\u66F8\u7C64 ID \u683C\u5F0F\u7121\u6548");
-  if (bookmarkUrl && !/^https?:\/\//.test(bookmarkUrl))
-    throw new Error("\u66F8\u7C64\u7DB2\u5740\u683C\u5F0F\u7121\u6548");
-  if (bookmarkTitle && !bookmarkId || bookmarkUrl && !bookmarkId)
-    throw new Error("\u7F3A\u5C11\u66F8\u7C64 ID");
   return {
     title,
     markdown,
     status,
     tags: cleanTags(value.tags ?? []),
     bookmark_id: bookmarkId,
-    bookmark_title: bookmarkTitle,
-    bookmark_url: bookmarkUrl
+    bookmark_title: null,
+    bookmark_url: null
   };
 }
 __name(checkNoteInput, "checkNoteInput");
@@ -33214,23 +33208,23 @@ __name(readLimitedText, "readLimitedText");
 // src/public-content.js
 var names = new Map(allTags.map((t) => [t.id, t.displayName]));
 var displayTag = /* @__PURE__ */ __name((id) => names.get(id) || id, "displayTag");
-function noteArticleHtml(note, siteUrl2) {
+function noteArticleHtml(note, siteUrl2, bookmarkHtml = "") {
   const date = (note.published_at || note.created_at).slice(0, 10);
   const tags = note.tags.map((id) => '<a class="text-primary-500" href="/notes/?tag=' + encodeURIComponent(id) + '">#' + htmlEscape(displayTag(id)) + "</a>").join("");
-  const bookmark = note.bookmark_id ? '<a class="text-primary-500 mt-3 inline-block text-sm" href="/bookmarks/view/?id=' + encodeURIComponent(note.bookmark_id) + '">\u53C3\u8003\u66F8\u7C64 \u2197</a>' : "";
+  const bookmark = note.bookmark_id ? '<aside class="mt-3 min-w-0 rounded-r-lg border-l-4 border-primary-500 bg-gray-50/60 px-3 py-2 dark:bg-gray-800/40" aria-label="\u5F15\u7528\u66F8\u7C64">' + (bookmarkHtml || '<p class="text-sm">\u5F15\u7528\u66F8\u7C64\uFF1A<a class="text-primary-500" href="/bookmarks/view/?id=' + encodeURIComponent(note.bookmark_id) + '">\u67E5\u770B\u76EE\u524D\u5167\u5BB9</a></p>') + "</aside>" : "";
   const markdown = renderPublicMarkdown(note.markdown, siteUrl2);
-  return '<article class="border-b border-gray-300/40 py-4 dark:border-gray-700"><time class="text-xs text-gray-500" datetime="' + htmlEscape(date) + '">' + htmlEscape(date) + '</time><h1 class="mt-2 text-xl leading-snug font-bold">' + htmlEscape(noteTitle(note)) + '</h1><div class="mt-3 prose max-w-none text-sm dark:prose-invert">' + markdown + "</div>" + bookmark + '<div class="mt-3 flex flex-wrap gap-2 text-sm">' + tags + "</div></article>";
+  return '<article class="border-b border-gray-300/40 py-4 dark:border-gray-700"><time class="text-xs text-gray-500" datetime="' + htmlEscape(date) + '">' + htmlEscape(date) + '</time><h1 class="mt-2 text-xl leading-snug font-bold">' + htmlEscape(noteTitle(note)) + "</h1>" + bookmark + '<div class="mt-3 prose max-w-none text-sm dark:prose-invert">' + markdown + '</div><div class="mt-3 flex flex-wrap gap-2 text-sm">' + tags + "</div></article>";
 }
 __name(noteArticleHtml, "noteArticleHtml");
 
 // src/public-page.js
-async function publicNotePage(request, note) {
+async function publicNotePage(request, note, bookmarkHtml = "") {
   const site = "ChrisTorng \u5B78\u7FD2\u5929\u5730";
   const origin = new URL(request.url).origin;
   const canonical = origin + "/notes/" + encodeURIComponent(note.slug) + "/";
   const title = noteTitle(note);
   const text2 = plainText(note.markdown).slice(0, 180);
-  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">\u2190 \u96A8\u7B46\u5217\u8868</a><div class="mt-4">' + noteArticleHtml(note, origin) + "</div></section>";
+  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">\u2190 \u96A8\u7B46\u5217\u8868</a><div class="mt-4">' + noteArticleHtml(note, origin, bookmarkHtml) + "</div></section>";
   const jsonld = JSON.stringify({
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -33262,11 +33256,37 @@ async function publicNotePage(request, note) {
     } });
   }
   const headers = new Headers(template.headers);
-  headers.set("Cache-Control", "public, max-age=60");
+  headers.set("Cache-Control", note.bookmark_id ? "no-store" : "public, max-age=60");
   headers.delete("content-length");
   return rewrite.transform(new Response(template.body, { status: 200, headers }));
 }
 __name(publicNotePage, "publicNotePage");
+
+// src/bookmark-embed.js
+var bookmarkIdPattern = /^[0-9a-f-]{36}$/;
+async function bookmarkEmbeds(notes, env, origin) {
+  const ids = [...new Set(notes.map((note) => note.bookmark_id).filter((id) => id && bookmarkIdPattern.test(id)))];
+  if (!ids.length) return {};
+  if (!env.BOOKMARKS) throw new Error("BOOKMARKS service binding is missing");
+  const results = await Promise.all(ids.map(async (id) => {
+    const response = await env.BOOKMARKS.fetch(
+      new Request(
+        "https://bookmarks.internal/bookmarks/api/embed/" + id,
+        { headers: { "Accept": "text/html" } }
+      )
+    );
+    if (response.status === 404)
+      return [id, '<p class="text-sm text-gray-500">\u5F15\u7528\u66F8\u7C64\u76EE\u524D\u672A\u516C\u958B\u6216\u5DF2\u79FB\u9664\u3002</p>'];
+    if (!response.ok) throw new Error("Cannot load referenced bookmark: " + response.status);
+    const html = (await response.text()).replace(
+      /\b(href|src)="\/(?!\/)/g,
+      (match2, attribute2) => attribute2 + '="' + origin + "/"
+    );
+    return [id, html];
+  }));
+  return Object.fromEntries(results);
+}
+__name(bookmarkEmbeds, "bookmarkEmbeds");
 
 // node_modules/fast-xml-parser/src/util.js
 var nameStartChar = ":A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD";
@@ -37490,9 +37510,9 @@ function pubDate(date) {
 }
 __name(pubDate, "pubDate");
 var cdata2 = /* @__PURE__ */ __name((html) => "<![CDATA[" + String(html).replaceAll("]]>", "]]]]><![CDATA[>") + "]]>", "cdata");
-function noteRssItem(n, siteUrl2) {
+function noteRssItem(n, siteUrl2, bookmarkHtmlById = {}) {
   const url = siteUrl2 + notePath(n);
-  const content = noteArticleHtml(n, siteUrl2);
+  const content = noteArticleHtml(n, siteUrl2, bookmarkHtmlById[n.bookmark_id] || "");
   const categories = n.tags.map((id) => "<category>" + htmlEscape(displayTag(id)) + "</category>").join("");
   return "<item><title>" + htmlEscape(noteTitle(n)) + "</title><link>" + htmlEscape(url) + '</link><guid isPermaLink="true">' + htmlEscape(url) + "</guid><pubDate>" + pubDate(n.published_at || n.created_at) + "</pubDate><description>" + htmlEscape(content) + "</description><content:encoded>" + cdata2(content) + "</content:encoded>" + categories + "</item>";
 }
@@ -37505,16 +37525,16 @@ function wrapRss(items, siteUrl2, title, link2) {
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>${htmlEscape(title)}</title><link>${htmlEscape(`${siteUrl2}${link2}`)}</link><description>${htmlEscape(title)}</description><language>zh-TW</language>${items.join("")}</channel></rss>`;
 }
 __name(wrapRss, "wrapRss");
-function rssXml(notes, siteUrl2, tag2 = "") {
+function rssXml(notes, siteUrl2, tag2 = "", bookmarkHtmlById = {}) {
   return wrapRss(
-    notes.map((n) => noteRssItem(n, siteUrl2)),
+    notes.map((n) => noteRssItem(n, siteUrl2, bookmarkHtmlById)),
     siteUrl2,
     (tag2 ? (allTags.find((t) => t.id === tag2)?.displayName || tag2) + " \xB7 \u96A8\u7B46 RSS" : "\u6240\u6709\u96A8\u7B46 RSS") + " | ChrisTorng \u5B78\u7FD2\u5929\u5730",
     "/notes/" + (tag2 ? "?tag=" + encodeURIComponent(tag2) : "")
   );
 }
 __name(rssXml, "rssXml");
-function allRssXml(notes, blogItems, siteUrl2, tag2 = "") {
+function allRssXml(notes, blogItems, siteUrl2, tag2 = "", bookmarkHtmlById = {}) {
   const items = [
     ...notes.map((note) => ({
       kind: "note",
@@ -37523,7 +37543,7 @@ function allRssXml(notes, blogItems, siteUrl2, tag2 = "") {
     })),
     ...blogItems.filter((item) => !tag2 || item.tags.includes(tag2))
   ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 100).map(
-    (item) => item.kind === "note" ? noteRssItem(item.note, siteUrl2) : articleRssItem(item)
+    (item) => item.kind === "note" ? noteRssItem(item.note, siteUrl2, bookmarkHtmlById) : articleRssItem(item)
   );
   return wrapRss(
     items,
@@ -37776,7 +37796,8 @@ var worker = {
       if (path === "/notes/feed.xml" && req.method === "GET") {
         const tag2 = url.searchParams.get("tag") || "";
         const data = await listNotes(env.DB, { pageSize: 100, tag: tag2 });
-        return xml(rssXml(data.items, siteUrl(env), tag2), "application/rss+xml");
+        const embeds = await bookmarkEmbeds(data.items, env, siteUrl(env));
+        return xml(rssXml(data.items, siteUrl(env), tag2, embeds), "application/rss+xml");
       }
       if (path === "/notes/all/feed.xml" && req.method === "GET") {
         const tag2 = url.searchParams.get("tag") || "";
@@ -37786,7 +37807,8 @@ var worker = {
         ]);
         if (blogs.error && !blogs.items.length)
           return new Response(blogs.error, { status: 503, headers: { "Retry-After": "60" } });
-        return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag2), "application/rss+xml");
+        const embeds = await bookmarkEmbeds(notes.items, env, siteUrl(env));
+        return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag2, embeds), "application/rss+xml");
       }
       if (path === "/notes/sitemap.xml" && req.method === "GET") {
         const total = (await listNotes(env.DB, { pageSize: 1 })).total;
@@ -37811,7 +37833,8 @@ var worker = {
           if (note?.slug) {
             const canonical = "/notes/" + note.slug + "/";
             if (url.pathname !== canonical) return Response.redirect(url.origin + canonical, 308);
-            return publicNotePage(req, note);
+            const embeds = await bookmarkEmbeds([note], env, url.origin);
+            return publicNotePage(req, note, embeds[note.bookmark_id] || "");
           }
           return json({ error: "\u627E\u4E0D\u5230\u96A8\u7B46" }, 404);
         }
