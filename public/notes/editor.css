@@ -369,3 +369,14 @@ dialog h2 {
 .compose-pane .title-field{flex-direction:column;align-items:stretch;justify-content:center;gap:5px}
 .bookmark-reference{width:100%;min-width:0;font-size:.77rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 .bookmark-reference a{overflow-wrap:anywhere;text-decoration:underline;text-underline-offset:2px}
+
+/* Notes editor: render live bookmark HTML inline without a nested scroll area. */
+#preview .bookmark-embed{min-width:0;margin:10px 0 16px;padding:10px 14px;border-left:4px solid var(--accent);border-radius:0 7px 7px 0;background:var(--bg);overflow-wrap:anywhere}
+#preview .bookmark-embed article{padding:4px 0;border-bottom:1px solid var(--line)}
+#preview .bookmark-embed h1{font-size:1.15rem;line-height:1.5;margin:8px 0;font-weight:700}
+#preview .bookmark-embed .prose{padding:0;overflow:visible;max-width:none;min-height:0}
+#preview .bookmark-embed img{max-width:100%;height:auto}
+#preview .bookmark-embed .flex{display:flex;flex-wrap:wrap;gap:5px 10px;align-items:center}
+#preview .bookmark-embed .text-xs{font-size:.8rem}
+#preview .bookmark-embed .text-sm{font-size:.87rem}
+#preview .bookmark-embed a{overflow-wrap:anywhere}
