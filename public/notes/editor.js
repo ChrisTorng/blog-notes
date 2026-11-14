@@ -192,11 +192,11 @@ function updateBookmarkRef() {
   link.href = '/bookmarks/view/?id=' + encodeURIComponent(bookmarkRef.id)
   link.target = '_blank'
   link.rel = 'noopener noreferrer'
-  link.textContent = '引用書籤：' + (bookmarkRef.title || '查看書籤')
+  link.textContent = '引用書籤：查看最新內容'
   node.append(link)
 }
 function load(item = {}) {
-  bookmarkRef = item.bookmark_id ? {id:item.bookmark_id,title:item.bookmark_title,url:item.bookmark_url} : null
+  bookmarkRef = item.bookmark_id ? {id:item.bookmark_id} : null
   updateBookmarkRef()
   $('title').value = item.title || ''
   $('markdown').value = item.markdown || ''
@@ -283,7 +283,7 @@ async function loadBookmarkIfRequested() {
     if (!response.ok) throw new Error('引用的書籤尚未公開或不存在')
     const item = await response.json()
     if (!item?.id || item.status < 3) throw new Error('請先公開書籤，再建立隨筆')
-    bookmarkRef = { id: item.id, title: item.title }
+    bookmarkRef = { id: item.id }
     updateBookmarkRef()
     schedulePreview()
     notice('已引用書籤；只儲存書籤 ID，請填寫心得。')
