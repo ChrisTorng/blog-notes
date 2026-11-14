@@ -1,14 +1,14 @@
 import { htmlEscape as esc, noteTitle, plainText } from './markdown.js';
 import { noteArticleHtml } from './public-content.js';
 
-export async function publicNotePage(request, note) {
+export async function publicNotePage(request, note, bookmarkHtml = '') {
   const site = 'ChrisTorng 學習天地';
   const origin = new URL(request.url).origin;
   const canonical = origin + '/notes/' + encodeURIComponent(note.slug) + '/';
   const title = noteTitle(note);
   const text = plainText(note.markdown).slice(0, 180);
   const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">← 隨筆列表</a>'+
-    '<div class="mt-4">'+noteArticleHtml(note,origin)+'</div></section>';
+    '<div class="mt-4">'+noteArticleHtml(note,origin,bookmarkHtml)+'</div></section>';
   const jsonld = JSON.stringify({
     '@context':'https://schema.org','@type':'BlogPosting',
     headline:title,datePublished:note.published_at||note.created_at,
@@ -33,7 +33,7 @@ export async function publicNotePage(request, note) {
     rewrite = rewrite.on(selector,{element(el){el.remove();}});
   }
   const headers = new Headers(template.headers);
-  headers.set('Cache-Control','public, max-age=60');
+  headers.set('Cache-Control',note.bookmark_id ? 'no-store' : 'public, max-age=60');
   headers.delete('content-length');
   return rewrite.transform(new Response(template.body,{status:200,headers}));
 }
