@@ -37,6 +37,31 @@ const xml = (body, mime = 'application/xml') =>
 const siteUrl = (env) => (env.SITE_URL || 'https://christorng.idv.tw').replace(/\/$/, '')
 const noteSlug = /^[0-9]{8}-[a-f0-9]{10}$/
 
+const bookmarkIdPattern = /^[0-9a-f-]{36}$/
+// The service binding calls Bookmarks' public canonical HTML API directly.
+// No stored snapshot or custom HTML renderer is kept by Notes.
+async function bookmarkEmbeds(notes, env, origin) {
+  const ids = [...new Set(notes.map(note => note.bookmark_id)
+    .filter(id => id && bookmarkIdPattern.test(id)))]
+  if (!ids.length) return {}
+  if (!env.BOOKMARKS) throw new Error('BOOKMARKS service binding is missing')
+  const results = await Promise.all(ids.map(async id => {
+    const response = await env.BOOKMARKS.fetch(
+      new Request('https://bookmarks.internal/bookmarks/api/embed/' + id,
+        {headers: {'Accept': 'text/html'}})
+    )
+    if (response.status === 404)
+      return [id, '<p class="text-sm text-gray-500">引用書籤目前未公開或已移除。</p>']
+    if (!response.ok) throw new Error('Cannot load referenced bookmark: ' + response.status)
+    // RSS readers do not necessarily resolve relative paths against our website.
+    const html = (await response.text()).replace(
+      /\\b(href|src)="\/(?!\/)/g, (match, attribute) => attribute + '="' + origin + '/'
+    )
+    return [id, html]
+  }))
+  return Object.fromEntries(results)
+}
+
 async function readPayload(req) {
   if (!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))
     throw Error('Content-Type 必須為 application/json')
@@ -166,7 +191,8 @@ const worker = {
       if (path === '/notes/feed.xml' && req.method === 'GET') {
         const tag = url.searchParams.get('tag') || ''
         const data = await listNotes(env.DB, { pageSize: 100, tag })
-        return xml(rssXml(data.items, siteUrl(env), tag), 'application/rss+xml')
+        const embeds = await bookmarkEmbeds(data.items, env, siteUrl(env))
+        return xml(rssXml(data.items, siteUrl(env), tag, embeds), 'application/rss+xml')
       }
       if (path === '/notes/all/feed.xml' && req.method === 'GET') {
         const tag = url.searchParams.get('tag') || ''
@@ -176,7 +202,8 @@ const worker = {
         ])
         if (blogs.error && !blogs.items.length)
           return new Response(blogs.error, { status: 503, headers: { 'Retry-After': '60' } })
-        return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag), 'application/rss+xml')
+        const embeds = await bookmarkEmbeds(notes.items, env, siteUrl(env))
+        return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag, embeds), 'application/rss+xml')
       }
       if (path === '/notes/sitemap.xml' && req.method === 'GET') {
         const total = (await listNotes(env.DB, { pageSize: 1 })).total
@@ -204,7 +231,8 @@ const worker = {
           if (note?.slug) {
             const canonical = '/notes/' + note.slug + '/'
             if (url.pathname !== canonical) return Response.redirect(url.origin + canonical,308)
-            return publicNotePage(req,note)
+            const embeds = await bookmarkEmbeds([note], env, url.origin)
+            return publicNotePage(req,note,embeds[note.bookmark_id] || '')
           }
           return json({ error: '找不到隨筆' },404)
         }
