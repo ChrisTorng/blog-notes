@@ -31149,6 +31149,10 @@ function renderPublicMarkdown(input, siteUrl2) {
       const value = encoded.replaceAll("&amp;", "&");
       const url = new URL(value, root);
       if (!["https:", "http:", "mailto:"].includes(url.protocol)) return attribute2 + '="#"';
+      if (url.origin === "https://christorng.idv.tw" && url.pathname.startsWith("/blog-assets/"))
+        return attribute2 + '="' + htmlEscape("https://assets.christorng.idv.tw/" + url.pathname.slice("/blog-assets/".length) + url.search + url.hash) + '"';
+      if (url.origin === "https://christorng.idv.tw" && url.pathname.startsWith("/blog-media/"))
+        return attribute2 + '="' + htmlEscape("https://media.christorng.idv.tw/" + url.pathname.slice("/blog-media/".length) + url.search + url.hash) + '"';
       return attribute2 + '="' + htmlEscape(url.href) + '"';
     } catch {
       return attribute2 + '="#"';
@@ -31365,8 +31369,8 @@ var names = new Map(allTags.map((t) => [t.id, t.displayName]));
 var displayTag = /* @__PURE__ */ __name((id) => names.get(id) || id, "displayTag");
 function noteArticleHtml(note, siteUrl2, bookmarkHtml = "", { asReference = false } = {}) {
   const date = (note.published_at || note.created_at).slice(0, 10);
-  const tags = note.tags.map((id) => '<a class="text-primary-500" href="' + htmlEscape(siteUrl2) + "/notes/?tag=" + encodeURIComponent(id) + '">#' + htmlEscape(displayTag(id)) + "</a>").join("");
-  const bookmark = !asReference && note.bookmark_id ? '<aside class="mt-3 min-w-0 rounded-r-lg border-l-4 border-primary-500 bg-gray-50/60 px-3 py-2 dark:bg-gray-800/40" aria-label="\u5F15\u7528\u66F8\u7C64">' + (bookmarkHtml || '<p class="text-sm">\u5F15\u7528\u66F8\u7C64\uFF1A<a class="text-primary-500" href="/bookmarks/view/?id=' + encodeURIComponent(note.bookmark_id) + '">\u67E5\u770B\u76EE\u524D\u5167\u5BB9</a></p>') + "</aside>" : "";
+  const tags = note.tags.map((id) => '<a class="text-primary-500" href="' + htmlEscape(siteUrl2) + "/notes/?tag=" + encodeURIComponent(id) + '">#' + htmlEscape(displayTag(id)) + "</a>").join(" ");
+  const bookmark = !asReference && note.bookmark_id ? '<aside class="mt-3 min-w-0 rounded-r-lg border-l-4 border-primary-500 bg-gray-50/60 px-3 py-2 dark:bg-gray-800/40" aria-label="\u5F15\u7528\u66F8\u7C64"><hr><p><strong>\u5F15\u7528\u66F8\u7C64</strong></p>' + (bookmarkHtml || '<p class="text-sm">\u5F15\u7528\u66F8\u7C64\uFF1A<a class="text-primary-500" href="/bookmarks/view/?id=' + encodeURIComponent(note.bookmark_id) + '">\u67E5\u770B\u76EE\u524D\u5167\u5BB9</a></p>') + "</aside>" : "";
   const markdown = renderPublicMarkdown(note.markdown, siteUrl2);
   const title = htmlEscape(noteTitle(note));
   const heading2 = asReference ? '<h2 class="mt-2 text-xl leading-snug font-bold"><a class="text-primary-500" href="' + htmlEscape(siteUrl2 + notePath(note)) + '">' + title + "</a></h2>" : '<h1 class="mt-2 text-xl leading-snug font-bold">' + title + "</h1>";
