@@ -29,6 +29,7 @@ test('Notes public page, own RSS and combined RSS use identical complete HTML',(
   assert.ok(html.includes('<img src="https://example.org/picture.png"'))
   assert.ok(html.includes('<strong>重點</strong>'))
   assert.ok(html.includes('引用書籤'))
+  assert.ok(html.includes('<hr><p><strong>引用書籤</strong></p>'))
   assert.ok(html.includes('/bookmarks/view/?id='))
   assert.ok(html.includes('#AI'))
   assert.ok(!html.includes('<script>'))
@@ -38,4 +39,5 @@ test('Notes Markdown relative URLs share root-based resolution and reject script
   assert.ok(renderPublicMarkdown('[link](./test)','https://example.org/notes/slug/')
     .includes('href="https://example.org/test"'))
   assert.doesNotMatch(renderPublicMarkdown('[bad](javascript:alert(1))','https://example.org/'),/href="javascript:/)
+  assert.match(renderPublicMarkdown('![圖片](/blog-assets/images/a.png)','https://christorng.idv.tw'),/src="https:\/\/assets.christorng.idv.tw\/images\/a.png"/)
 })
