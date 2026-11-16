@@ -30,6 +30,12 @@ export function renderPublicMarkdown(input, siteUrl) {
       const value = encoded.replaceAll('&amp;', '&')
       const url = new URL(value, root)
       if (!['https:', 'http:', 'mailto:'].includes(url.protocol)) return attribute + '="#"'
+      // Main-site image/media paths are hosted on separate origins in production.
+      // They do not exist at /blog-assets/ or /blog-media/ on GitHub Pages.
+      if (url.origin === 'https://christorng.idv.tw' && url.pathname.startsWith('/blog-assets/'))
+        return attribute + '="' + htmlEscape('https://assets.christorng.idv.tw/' + url.pathname.slice('/blog-assets/'.length) + url.search + url.hash) + '"'
+      if (url.origin === 'https://christorng.idv.tw' && url.pathname.startsWith('/blog-media/'))
+        return attribute + '="' + htmlEscape('https://media.christorng.idv.tw/' + url.pathname.slice('/blog-media/'.length) + url.search + url.hash) + '"'
       return attribute + '="' + htmlEscape(url.href) + '"'
     } catch {
       return attribute + '="#"'
