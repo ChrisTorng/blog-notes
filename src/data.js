@@ -39,6 +39,7 @@ export function checkNoteInput(value) {
 
 const fields = `n.id, n.slug, n.title, n.markdown, n.status, n.created_at, n.updated_at, n.published_at,
   n.bookmark_id, n.bookmark_title, n.bookmark_url,
+  (SELECT a.slug FROM note_slug_aliases a WHERE a.note_id=n.id ORDER BY a.rowid ASC LIMIT 1) AS rss_slug,
   COALESCE((SELECT json_group_array(tag_id) FROM note_tags WHERE note_id=n.id), '[]') AS tags`
 
 function decode(note) {
@@ -71,6 +72,14 @@ export async function getNote(db, id, includeDraft = false) {
 
 export async function getNoteBySlug(db, slug) {
   const row = await db.prepare(`SELECT ${fields} FROM notes n WHERE n.slug=? AND n.status='published' LIMIT 1`).bind(slug).first()
+  return decode(row)
+}
+
+// Old publicly shared permalinks remain valid, but always redirect to the
+// current English permalink; unpublished notes are never exposed.
+export async function getNoteByAlias(db, slug) {
+  const row = await db.prepare(`SELECT ${fields} FROM note_slug_aliases a
+    JOIN notes n ON n.id=a.note_id WHERE a.slug=? AND n.status='published' LIMIT 1`).bind(slug).first()
   return decode(row)
 }
 export async function listNotes(
@@ -116,7 +125,7 @@ function newId(now) {
   return `${prefix}-${crypto.randomUUID().replaceAll('-', '').slice(0, 10)}`
 }
 
-export async function createNote(db, raw) {
+export async function createNote(db, raw, englishSlug = null) {
   const input = checkNoteInput(raw)
   const now = new Date().toISOString()
   const id = newId(now)
@@ -147,12 +156,15 @@ export async function createNote(db, raw) {
     )
   )
   await db.batch(statements)
-  if (input.status === 'published')
-    await ensureSlug(db, 'notes', id, noteTitle(input))
+  if (input.status === 'published') {
+    if (!englishSlug && !(await getNote(db, id, true))?.slug)
+      throw new Error('公開隨筆必須先產生英文網址');
+    await ensureSlug(db, 'notes', id, englishSlug || noteTitle(input), { englishOnly: true });
+  }
   return getNote(db, id, true)
 }
 
-export async function updateNote(db, id, raw) {
+export async function updateNote(db, id, raw, englishSlug = null) {
   const input = checkNoteInput(raw)
   const current = await getNote(db, id, true)
   if (!current) return null
@@ -173,8 +185,11 @@ export async function updateNote(db, id, raw) {
     ),
   ]
   await db.batch(stmts)
-  if (input.status === 'published')
-    await ensureSlug(db, 'notes', id, noteTitle(input))
+  if (input.status === 'published') {
+    if (!englishSlug && !(await getNote(db, id, true))?.slug)
+      throw new Error('公開隨筆必須先產生英文網址');
+    await ensureSlug(db, 'notes', id, englishSlug || noteTitle(input), { englishOnly: true });
+  }
   return getNote(db, id, true)
 }
 
@@ -183,6 +198,7 @@ export async function deleteNote(db, id) {
   if (!current) return false
   await db.batch([
     db.prepare('DELETE FROM note_tags WHERE note_id=?').bind(id),
+    db.prepare('DELETE FROM note_slug_aliases WHERE note_id=?').bind(id),
     db.prepare('DELETE FROM notes WHERE id=?').bind(id),
   ])
   return true
