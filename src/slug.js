@@ -43,7 +43,7 @@ export function slugify(title, fallback = 'entry') {
 // English-only slugs are created from semantic translations, never pinyin.
 export function slugifyEnglish(title) {
   const source = String(title || '').normalize('NFKC');
-  if (/[^\\x00-\\x7f]/.test(source)) throw new Error('英文網址不能含有非 ASCII 字元');
+  if (/[^\x00-\x7f]/.test(source)) throw new Error('英文網址不能含有非 ASCII 字元');
   const words = source.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const slug = words.slice(0, 100).replace(/-+$/g, '');
   if (!/[a-z]/.test(slug)) throw new Error('英文網址缺少有效英文單字');
