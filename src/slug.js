@@ -40,15 +40,25 @@ export function slugify(title, fallback = 'entry') {
   return value || fallback;
 }
 
+// English-only slugs are created from semantic translations, never pinyin.
+export function slugifyEnglish(title) {
+  const source = String(title || '').normalize('NFKC');
+  if (/[^\\x00-\\x7f]/.test(source)) throw new Error('英文網址不能含有非 ASCII 字元');
+  const words = source.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = words.slice(0, 100).replace(/-+$/g, '');
+  if (!/[a-z]/.test(slug)) throw new Error('英文網址缺少有效英文單字');
+  return slug;
+}
+
 // Restrict the SQL table name to code-selected values, not request data.
 // Unique DB constraints resolve concurrent slug collisions safely.
-export async function ensureSlug(db, table, id, title) {
+export async function ensureSlug(db, table, id, title, { englishOnly = false } = {}) {
   if (table !== 'bookmarks' && table !== 'notes') throw new Error('Invalid slug table');
   const query = () => db.prepare('SELECT slug FROM ' + table + ' WHERE id=?').bind(id).first();
   const existing = await query();
   if (!existing) return null;
   if (existing.slug) return existing.slug;
-  const base = slugify(title, table === 'notes' ? 'note' : 'bookmark');
+  const base = englishOnly ? slugifyEnglish(title) : slugify(title, table === 'notes' ? 'note' : 'bookmark');
   for (let n = 1; n <= 10000; n++) {
     const tail = n === 1 ? '' : '-' + n;
     const candidate = base.slice(0, 100 - tail.length).replace(/-+$/g, '') + tail;
@@ -56,6 +66,7 @@ export async function ensureSlug(db, table, id, title) {
       ? ['view','editor','admin','api','all','page','feed','sitemap']
       : ['view','admin','api','feed','sitemap'];
     if (reserved.includes(candidate) || (table === 'notes' && /^[0-9]{8}-[a-f0-9]{10}$/.test(candidate))) continue;
+    if (table === 'notes' && await db.prepare('SELECT 1 FROM note_slug_aliases WHERE slug=? LIMIT 1').bind(candidate).first()) continue;
     try {
       const result = await db.prepare('UPDATE ' + table + ' SET slug=? WHERE id=? AND slug IS NULL')
         .bind(candidate, id).run();
