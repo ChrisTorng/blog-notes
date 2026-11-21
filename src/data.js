@@ -1,5 +1,5 @@
 import tagDefinitions from '../shared/tags.json' with { type: 'json' }
-import { ensureSlug } from './slug.js'
+import { ensureSlug, translatedNoteSlug } from './slug.js'
 import { noteTitle } from './markdown.js'
 
 export const PAGE_SIZE = 20
@@ -37,7 +37,7 @@ export function checkNoteInput(value) {
     bookmark_id: bookmarkId, bookmark_title: null, bookmark_url: null }
 }
 
-const fields = `n.id, n.slug, n.title, n.markdown, n.status, n.created_at, n.updated_at, n.published_at,
+const fields = `n.id, n.slug, n.rss_guid, n.title, n.markdown, n.status, n.created_at, n.updated_at, n.published_at,
   n.bookmark_id, n.bookmark_title, n.bookmark_url,
   COALESCE((SELECT json_group_array(tag_id) FROM note_tags WHERE note_id=n.id), '[]') AS tags`
 
@@ -71,6 +71,11 @@ export async function getNote(db, id, includeDraft = false) {
 
 export async function getNoteBySlug(db, slug) {
   const row = await db.prepare(`SELECT ${fields} FROM notes n WHERE n.slug=? AND n.status='published' LIMIT 1`).bind(slug).first()
+  return decode(row)
+}
+export async function getNoteByOldSlug(db, slug) {
+  const row = await db.prepare(`SELECT ${fields} FROM note_slug_redirects r JOIN notes n ON n.id=r.note_id
+    WHERE r.slug=? AND n.status='published' LIMIT 1`).bind(slug).first()
   return decode(row)
 }
 export async function listNotes(
@@ -116,8 +121,11 @@ function newId(now) {
   return `${prefix}-${crypto.randomUUID().replaceAll('-', '').slice(0, 10)}`
 }
 
-export async function createNote(db, raw) {
+export async function createNote(db, raw, ai = null) {
   const input = checkNoteInput(raw)
+  // Resolve the English URL before inserting data so translation failures do not
+  // produce published notes without a canonical permalink.
+  const preferredSlug = input.status === 'published' ? await translatedNoteSlug(noteTitle(input), ai) : ''
   const now = new Date().toISOString()
   const id = newId(now)
   const statements = [
@@ -147,15 +155,20 @@ export async function createNote(db, raw) {
     )
   )
   await db.batch(statements)
-  if (input.status === 'published')
-    await ensureSlug(db, 'notes', id, noteTitle(input))
+  if (input.status === 'published') {
+    const slug = await ensureSlug(db, 'notes', id, noteTitle(input), preferredSlug)
+    await db.prepare('UPDATE notes SET rss_guid=COALESCE(rss_guid, ?) WHERE id=?')
+      .bind('https://christorng.idv.tw/notes/' + encodeURIComponent(slug) + '/', id).run()
+  }
   return getNote(db, id, true)
 }
 
-export async function updateNote(db, id, raw) {
+export async function updateNote(db, id, raw, ai = null) {
   const input = checkNoteInput(raw)
   const current = await getNote(db, id, true)
   if (!current) return null
+  const preferredSlug = input.status === 'published' && !current.slug
+    ? await translatedNoteSlug(noteTitle(input), ai) : ''
   const now = new Date().toISOString()
   const publishedAt =
     input.status === 'published' ? current.published_at || now : null
@@ -173,8 +186,11 @@ export async function updateNote(db, id, raw) {
     ),
   ]
   await db.batch(stmts)
-  if (input.status === 'published')
-    await ensureSlug(db, 'notes', id, noteTitle(input))
+  if (input.status === 'published') {
+    const slug = await ensureSlug(db, 'notes', id, noteTitle(input), preferredSlug)
+    await db.prepare('UPDATE notes SET rss_guid=COALESCE(rss_guid, ?) WHERE id=?')
+      .bind('https://christorng.idv.tw/notes/' + encodeURIComponent(slug) + '/', id).run()
+  }
   return getNote(db, id, true)
 }
 
@@ -183,6 +199,7 @@ export async function deleteNote(db, id) {
   if (!current) return false
   await db.batch([
     db.prepare('DELETE FROM note_tags WHERE note_id=?').bind(id),
+    db.prepare('DELETE FROM note_slug_redirects WHERE note_id=?').bind(id),
     db.prepare('DELETE FROM notes WHERE id=?').bind(id),
   ])
   return true
