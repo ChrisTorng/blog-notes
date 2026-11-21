@@ -61,7 +61,7 @@ export async function publicNotesList(req, env) {
     '</select></label><button type="submit" class="ml-2 rounded bg-primary-500 px-3 py-1 text-sm text-white">篩選</button></form>' +
     (cards || '<p class="py-6 text-gray-500">目前沒有隨筆。</p>') + pageLinks +
     '</div></div></section>'
-  const shell = await fetch(url.origin + '/notes-shell/', {headers:{Accept:'text/html'}})
+  const shell = await fetch(env.BLOG_SHELL_URL || url.origin + '/notes-shell/', {headers:{Accept:'text/html'}})
   if (!shell.ok) return new Response('網站版型暫時無法取得', {status:503,headers:{'Cache-Control':'no-store'}})
   const meta = '<meta name="description" content="ChrisTorng 的隨筆，包含完整文章內容與引用書籤">' +
     '<meta name="robots" content="' + (url.searchParams.size ? 'noindex,follow' : 'index,follow') + '">' +
