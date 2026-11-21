@@ -41,3 +41,15 @@ test('Notes Markdown relative URLs share root-based resolution and reject script
   assert.doesNotMatch(renderPublicMarkdown('[bad](javascript:alert(1))','https://example.org/'),/href="javascript:/)
   assert.match(renderPublicMarkdown('![圖片](/blog-assets/images/a.png)','https://christorng.idv.tw'),/src="https:\/\/assets.christorng.idv.tw\/images\/a.png"/)
 })
+
+test('Notes RSS preserves original GUID after changing its public permalink',()=>{
+  const old='https://christorng.idv.tw/notes/wo-de-xue-xi-xin-de/';
+  const changed={...note,slug:'my-learning-experience',rss_guid:old};
+  const rss=rssXml([changed],'https://christorng.idv.tw');
+  const combined=allRssXml([changed],[],'https://christorng.idv.tw');
+  for(const xml of [rss,combined]){
+    assert.ok(xml.includes('<link>https://christorng.idv.tw/notes/my-learning-experience/</link>'));
+    assert.ok(xml.includes('<guid isPermaLink="true">'+old+'</guid>'));
+    assert.equal(XMLValidator.validate(xml),true);
+  }
+});
