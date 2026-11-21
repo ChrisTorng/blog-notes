@@ -58,7 +58,25 @@ async function readPayload(req) {
   }
 }
 
-async function adminApi(req, env, url, path) {
+// Report cache failures separately from successful D1 writes.
+async function invalidateAfterSave(env, ctx) {
+  if (env.AUTH_MODE === 'local') return null
+  try {
+    if (!ctx?.exports?.PublicCache?.purgePublic || !env.BOOKMARK_EDITOR?.invalidatePublic)
+      throw new Error('Public cache invalidation bindings unavailable')
+    await ctx.exports.PublicCache.purgePublic()
+    await env.BOOKMARK_EDITOR.invalidatePublic()
+    return null
+  } catch (error) {
+    console.error('Notes saved, but cache purge failed',String(error))
+    return json({
+      saved:true,code:'PUBLIC_CACHE_PURGE_FAILED',
+      error:'隨筆已儲存，但公開快取更新未完成。請稍後重新整理，或再次儲存以重試。'
+    },503)
+  }
+}
+
+async function adminApi(req, env, url, path, ctx) {
   const identity = await adminIdentity(req, env)
   if (!identity) return json({ error: '尚未通過管理員驗證' }, 401)
   if (!allowedOrigin(req, env)) return json({ error: '不允許跨來源修改' }, 403)
@@ -89,7 +107,8 @@ async function adminApi(req, env, url, path) {
     if (req.method === 'POST') {
       const raw = await readPayload(req)
       await ensurePublishedBookmark(env, raw)
-      return json(await createNote(env.DB, raw, env.AI), 201)
+      const created = await createNote(env.DB, raw, env.AI)
+      return await invalidateAfterSave(env, ctx) || json(created,201)
     }
   }
   const found = path.match(/^\/notes\/api\/admin\/([^/]+)\/?$/)
@@ -105,11 +124,13 @@ async function adminApi(req, env, url, path) {
       const raw = await readPayload(req)
       await ensurePublishedBookmark(env, raw)
       const item = await updateNote(env.DB, found[1], raw, env.AI)
-      return item ? json(item) : json({ error: '找不到資料' }, 404)
+      if (!item) return json({ error: '找不到資料' },404)
+      return await invalidateAfterSave(env, ctx) || json(item)
     }
     if (req.method === 'DELETE') {
       const deleted = await deleteNote(env.DB, found[1])
-      return deleted ? json({ ok: true }) : json({ error: '找不到資料' }, 404)
+      if (!deleted) return json({ error: '找不到資料' },404)
+      return await invalidateAfterSave(env, ctx) || json({ok:true})
     }
   }
   return json({ error: '不存在的管理 API' }, 404)
@@ -168,7 +189,7 @@ const worker = {
     }
     try {
       if (path === '/notes/api/admin' || path.startsWith('/notes/api/admin/'))
-        return adminApi(req, env, url, path)
+        return adminApi(req, env, url, path, ctx)
       if (/^\/notes\/api\/session\/?$/.test(path) && req.method === 'GET')
         return json({ admin: Boolean(await adminIdentity(req, env)) })
       if (path === '/notes/api/categories' && req.method === 'GET') {
