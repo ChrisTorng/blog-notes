@@ -5,7 +5,9 @@ import {
   deleteNote,
   getNote,
   getNoteBySlug,
+  getNoteByAlias,
   listNotes,
+  checkNoteInput,
   PAGE_SIZE,
   pageNumber,
   updateNote,
@@ -13,6 +15,7 @@ import {
 import { ensurePublishedBookmark } from './bookmark-publication.js'
 import { adminIdentity, allowedOrigin } from './auth.js'
 import { noteTitle, renderMarkdown } from './markdown.js'
+import { translatedNoteSlug } from './english-slug.js'
 import { readLimitedText } from './http.js'
 import { publicNotePage } from './public-page.js'
 import { bookmarkEmbeds } from './bookmark-embed.js'
@@ -82,8 +85,11 @@ async function adminApi(req, env, url, path) {
     }))
     if (req.method === 'POST') {
       const raw = await readPayload(req)
+      const valid = checkNoteInput(raw)
+      const slug = valid.status === 'published'
+        ? await translatedNoteSlug(env, noteTitle(valid)) : null
       await ensurePublishedBookmark(env, raw)
-      return json(await createNote(env.DB, raw), 201)
+      return json(await createNote(env.DB, raw, slug), 201)
     }
   }
   const found = path.match(/^\/notes\/api\/admin\/([^/]+)\/?$/)
@@ -97,8 +103,12 @@ async function adminApi(req, env, url, path) {
       if (!await getNote(env.DB, found[1], true))
         return json({ error: '找不到資料' }, 404)
       const raw = await readPayload(req)
+      const valid = checkNoteInput(raw)
+      const current = await getNote(env.DB, found[1], true)
+      const slug = valid.status === 'published' && !current.slug
+        ? await translatedNoteSlug(env, noteTitle(valid)) : null
       await ensurePublishedBookmark(env, raw)
-      const item = await updateNote(env.DB, found[1], raw)
+      const item = await updateNote(env.DB, found[1], raw, slug)
       return item ? json(item) : json({ error: '找不到資料' }, 404)
     }
     if (req.method === 'DELETE') {
@@ -219,7 +229,8 @@ const worker = {
         const match = path.match(/^\/notes\/([a-z0-9-]{1,100})\/?$/)
         if (match && !['view','editor','admin','api','all','page'].includes(match[1])) {
           const key = match[1]
-          const note = noteSlug.test(key) ? await getNote(env.DB,key) : await getNoteBySlug(env.DB,key)
+          const note = noteSlug.test(key) ? await getNote(env.DB,key) :
+            (await getNoteBySlug(env.DB,key)) || (await getNoteByAlias(env.DB,key))
           if (note?.slug) {
             const canonical = '/notes/' + note.slug + '/'
             if (url.pathname !== canonical) return Response.redirect(url.origin + canonical,308)
@@ -235,7 +246,7 @@ const worker = {
       return fetch(req)
     } catch (e) {
       if (e instanceof URIError) return json({ error: '網址格式無效' }, 400)
-      const bad = e instanceof Error && /Markdown|Tag|tags|標題|狀態|JSON|請求|未知|Content-Type|資料|引用書籤|分類|AI/.test(e.message)
+      const bad = e instanceof Error && /Markdown|Tag|tags|標題|狀態|JSON|請求|未知|Content-Type|資料|引用書籤|分類|AI|英文網址|翻譯/.test(e.message)
       return json({ error: bad ? e.message : '伺服器內部錯誤' }, bad ? 400 : 500)
     }
   },
