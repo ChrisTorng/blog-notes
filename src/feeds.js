@@ -22,10 +22,13 @@ function pubDate(date) {
 const cdata = html => '<![CDATA['+String(html).replaceAll(']]>',']]]]><![CDATA[>')+']]>';
 function noteRssItem(n, siteUrl, bookmarkHtmlById = {}) {
   const url = siteUrl + notePath(n);
+  // Keep existing RSS GUIDs stable when a published note gets a new URL.
+  // The original permalink now permanently redirects to the English URL.
+  const guid = siteUrl + notePath(n.rss_slug || n.slug || n.id);
   const content = noteArticleHtml(n,siteUrl,bookmarkHtmlById[n.bookmark_id] || '');
   const categories = n.tags.map(id=>'<category>'+htmlEscape(displayTag(id))+'</category>').join('');
   return '<item><title>'+htmlEscape(noteTitle(n))+'</title><link>'+htmlEscape(url)+
-    '</link><guid isPermaLink="true">'+htmlEscape(url)+'</guid><pubDate>'+
+    '</link><guid isPermaLink="true">'+htmlEscape(guid)+'</guid><pubDate>'+
     pubDate(n.published_at || n.created_at)+'</pubDate><description>'+
     htmlEscape(content)+'</description><content:encoded>'+cdata(content)+
     '</content:encoded>'+categories+'</item>';
