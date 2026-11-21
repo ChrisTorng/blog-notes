@@ -68,7 +68,7 @@
     }
   ],
   "cache": {
-    "enabled": true
+    "enabled": false
   },
   "exports": {
     "default": {
@@ -81,6 +81,12 @@
       "type": "worker",
       "cache": {
         "enabled": true
+      }
+    },
+    "BookmarkReferences": {
+      "type": "worker",
+      "cache": {
+        "enabled": false
       }
     }
   }
