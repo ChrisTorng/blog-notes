@@ -31402,6 +31402,13 @@ function pageNumber(input) {
   return Number.isSafeInteger(value) && value > 0 && value <= 1e5 ? value : 1;
 }
 __name(pageNumber, "pageNumber");
+async function noteTagCounts(db) {
+  const rows = await db.prepare(
+    "SELECT nt.tag_id, COUNT(*) AS count FROM note_tags nt JOIN notes n ON n.id=nt.note_id WHERE n.status='published' GROUP BY nt.tag_id"
+  ).all();
+  return Object.fromEntries(rows.results.map((row) => [row.tag_id, row.count]));
+}
+__name(noteTagCounts, "noteTagCounts");
 async function exportNoteBatch(db, afterId = "") {
   const rows = await db.prepare(
     `SELECT ${fields} FROM notes n WHERE n.id > ? ORDER BY n.id LIMIT 100`
@@ -33368,6 +33375,57 @@ async function bookmarkEmbeds(notes, env, origin) {
   return Object.fromEntries(results);
 }
 __name(bookmarkEmbeds, "bookmarkEmbeds");
+
+// src/public-list.js
+async function publicNotesList(req, env) {
+  const url = new URL(req.url);
+  const tag2 = url.searchParams.get("tag") || "";
+  const page = pageNumber(url.searchParams.get("page"));
+  const [data, counts] = await Promise.all([
+    listNotes(env.DB, { tag: tag2, page }),
+    noteTagCounts(env.DB)
+  ]);
+  const embeds = await bookmarkEmbeds(data.items, env, url.origin);
+  const active = allTags.find((t) => t.id === tag2);
+  const label = active ? active.displayName + " \xB7 \u96A8\u7B46" : "\u96A8\u7B46";
+  const buildLink = /* @__PURE__ */ __name((nextTag, nextPage = 1) => {
+    const p = new URLSearchParams();
+    if (nextTag) p.set("tag", nextTag);
+    if (nextPage > 1) p.set("page", String(nextPage));
+    return "/notes/" + (p.size ? "?" + p.toString() : "");
+  }, "buildLink");
+  const cards = data.items.map((note) => {
+    const html = noteArticleHtml(note, url.origin, embeds[note.bookmark_id] || "");
+    const permalink = '<p class="text-sm text-primary-500"><a href="' + htmlEscape(notePath(note)) + '">\u96A8\u7B46\u6C38\u4E45\u9023\u7D50\uFF1A' + htmlEscape(noteTitle(note)) + "</a></p>";
+    return html + permalink;
+  }).join("");
+  const tagLinks = allTags.map((t) => {
+    const selected = tag2 === t.id;
+    return '<a class="block rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ' + (selected ? "bg-gray-100 font-bold text-primary-500 dark:bg-gray-800" : "") + '" href="' + htmlEscape(buildLink(t.id)) + '">#' + htmlEscape(t.displayName) + ' <small class="text-gray-500">(' + Number(counts[t.id] || 0) + ")</small></a>";
+  }).join("");
+  const pageLinks = data.pages > 1 ? '<nav aria-label="\u5206\u9801" class="mt-6 flex items-center justify-between gap-3 text-sm">' + (page > 1 ? '<a class="text-primary-500" href="' + htmlEscape(buildLink(tag2, page - 1)) + '">\u2190 \u4E0A\u4E00\u9801</a>' : "<span></span>") + "<span>" + data.page + " / " + data.pages + "</span>" + (page < data.pages ? '<a class="text-primary-500" href="' + htmlEscape(buildLink(tag2, page + 1)) + '">\u4E0B\u4E00\u9801 \u2192</a>' : "<span></span>") + "</nav>" : "";
+  const body = '<section class="w-full py-5 pb-12"><header class="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h1 class="heading-accent text-3xl font-extrabold sm:text-5xl">' + htmlEscape(label) + ' <small class="ml-2 text-lg font-normal text-gray-500">Notes</small></h1><p class="mt-3 text-gray-500 dark:text-gray-400">\u500B\u4EBA\u96A8\u7B46\u3001\u89C0\u5BDF\u8207\u5B78\u7FD2\u5FC3\u5F97</p></div><a class="text-primary-500 text-sm" href="/notes/feed.xml' + (tag2 ? "?tag=" + encodeURIComponent(tag2) : "") + '" type="application/rss+xml">\u96A8\u7B46 RSS</a></header><div class="grid grid-cols-1 items-start gap-6 md:grid-cols-[244px_minmax(0,1fr)] lg:gap-12"><aside class="hidden md:block"><a class="mb-2 block font-bold text-primary-500" href="/notes/">\u6240\u6709\u96A8\u7B46 (' + Number(data.total) + ')</a><nav class="space-y-1" aria-label="\u96A8\u7B46\u5206\u985E">' + tagLinks + '</nav></aside><div class="min-w-0"><form action="/notes/" method="get" class="mb-2 md:hidden"><label>\u5206\u985E <select name="tag" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:bg-gray-800"><option value="">\u6240\u6709\u96A8\u7B46</option>' + allTags.map((t) => '<option value="' + htmlEscape(t.id) + '"' + (tag2 === t.id ? " selected" : "") + ">" + htmlEscape(t.displayName) + "</option>").join("") + '</select></label><button type="submit" class="ml-2 rounded bg-primary-500 px-3 py-1 text-sm text-white">\u7BE9\u9078</button></form>' + (cards || '<p class="py-6 text-gray-500">\u76EE\u524D\u6C92\u6709\u96A8\u7B46\u3002</p>') + pageLinks + "</div></div></section>";
+  const shell = await fetch(env.BLOG_SHELL_URL || url.origin + "/notes-shell/", { headers: { Accept: "text/html" } });
+  if (!shell.ok) return new Response("\u7DB2\u7AD9\u7248\u578B\u66AB\u6642\u7121\u6CD5\u53D6\u5F97", { status: 503, headers: { "Cache-Control": "no-store" } });
+  const meta = '<meta name="description" content="ChrisTorng \u7684\u96A8\u7B46\uFF0C\u5305\u542B\u5B8C\u6574\u6587\u7AE0\u5167\u5BB9\u8207\u5F15\u7528\u66F8\u7C64"><meta name="robots" content="' + (url.searchParams.size ? "noindex,follow" : "index,follow") + '"><link rel="canonical" href="' + htmlEscape(url.origin + "/notes/") + '">';
+  let rewrite = new HTMLRewriter().on("#notes-content", { element(el) {
+    el.setInnerContent(body, { html: true });
+  } }).on("title", { element(el) {
+    el.setInnerContent(label + " | ChrisTorng \u5B78\u7FD2\u5929\u5730");
+  } }).on("head", { element(el) {
+    el.append(meta, { html: true });
+  } });
+  for (const selector of ['meta[name="description"]', 'meta[name="robots"]', 'link[rel="canonical"]'])
+    rewrite = rewrite.on(selector, { element(el) {
+      el.remove();
+    } });
+  const headers = new Headers(shell.headers);
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  headers.set("Cache-Control", "no-store");
+  headers.delete("Content-Length");
+  return rewrite.transform(new Response(shell.body, { status: 200, headers }));
+}
+__name(publicNotesList, "publicNotesList");
 
 // node_modules/fast-xml-parser/src/util.js
 var nameStartChar = ":A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD";
@@ -37746,6 +37804,7 @@ var xml = /* @__PURE__ */ __name((body, mime = "application/xml", hasReferences 
 }), "xml");
 var siteUrl = /* @__PURE__ */ __name((env) => (env.SITE_URL || "https://christorng.idv.tw").replace(/\/$/, ""), "siteUrl");
 var noteSlug = /^[0-9]{8}-[a-f0-9]{10}$/;
+var isPublicPage = /* @__PURE__ */ __name((path) => path === "/notes/" || path === "/notes" || ["/notes/feed.xml", "/notes/all/feed.xml", "/notes/sitemap.xml"].includes(path) || /^\/notes\/[a-z0-9-]{1,100}\/?$/.test(path) && !["view", "editor", "admin", "api", "all", "page"].includes(path.split("/")[2]), "isPublicPage");
 async function readPayload(req) {
   if (!req.headers.get("content-type")?.toLowerCase().startsWith("application/json"))
     throw Error("Content-Type \u5FC5\u9808\u70BA application/json");
@@ -37758,7 +37817,25 @@ async function readPayload(req) {
   }
 }
 __name(readPayload, "readPayload");
-async function adminApi(req, env, url, path) {
+async function invalidateAfterSave(env, ctx) {
+  if (env.AUTH_MODE === "local") return null;
+  try {
+    if (!ctx?.exports?.PublicCache?.purgePublic || !env.BOOKMARK_EDITOR?.invalidatePublic)
+      throw new Error("Public cache invalidation bindings unavailable");
+    await ctx.exports.PublicCache.purgePublic();
+    await env.BOOKMARK_EDITOR.invalidatePublic();
+    return null;
+  } catch (error2) {
+    console.error("Notes saved, but cache purge failed", String(error2));
+    return json({
+      saved: true,
+      code: "PUBLIC_CACHE_PURGE_FAILED",
+      error: "\u96A8\u7B46\u5DF2\u5132\u5B58\uFF0C\u4F46\u516C\u958B\u5FEB\u53D6\u66F4\u65B0\u672A\u5B8C\u6210\u3002\u8ACB\u7A0D\u5F8C\u91CD\u65B0\u6574\u7406\uFF0C\u6216\u518D\u6B21\u5132\u5B58\u4EE5\u91CD\u8A66\u3002"
+    }, 503);
+  }
+}
+__name(invalidateAfterSave, "invalidateAfterSave");
+async function adminApi(req, env, url, path, ctx) {
   const identity = await adminIdentity(req, env);
   if (!identity) return json({ error: "\u5C1A\u672A\u901A\u904E\u7BA1\u7406\u54E1\u9A57\u8B49" }, 401);
   if (!allowedOrigin(req, env)) return json({ error: "\u4E0D\u5141\u8A31\u8DE8\u4F86\u6E90\u4FEE\u6539" }, 403);
@@ -37789,7 +37866,8 @@ async function adminApi(req, env, url, path) {
     if (req.method === "POST") {
       const raw = await readPayload(req);
       await ensurePublishedBookmark(env, raw);
-      return json(await createNote(env.DB, raw, env.AI), 201);
+      const created = await createNote(env.DB, raw, env.AI);
+      return await invalidateAfterSave(env, ctx) || json(created, 201);
     }
   }
   const found = path.match(/^\/notes\/api\/admin\/([^/]+)\/?$/);
@@ -37804,11 +37882,13 @@ async function adminApi(req, env, url, path) {
       const raw = await readPayload(req);
       await ensurePublishedBookmark(env, raw);
       const item = await updateNote(env.DB, found[1], raw, env.AI);
-      return item ? json(item) : json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
+      if (!item) return json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
+      return await invalidateAfterSave(env, ctx) || json(item);
     }
     if (req.method === "DELETE") {
       const deleted = await deleteNote(env.DB, found[1]);
-      return deleted ? json({ ok: true }) : json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
+      if (!deleted) return json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
+      return await invalidateAfterSave(env, ctx) || json({ ok: true });
     }
   }
   return json({ error: "\u4E0D\u5B58\u5728\u7684\u7BA1\u7406 API" }, 404);
@@ -37852,17 +37932,23 @@ async function combinedData(env, page, tag2 = "") {
 }
 __name(combinedData, "combinedData");
 var worker = {
-  async fetch(req, env) {
+  async fetch(req, env, ctx, inner = false) {
     if (req.method === "HEAD") {
-      const result = await worker.fetch(new Request(req, { method: "GET" }), env);
+      const result = await worker.fetch(new Request(req, { method: "GET" }), env, ctx, inner);
       return new Response(null, { status: result.status, headers: result.headers });
     }
     const url = new URL(req.url);
     const path = url.pathname;
     if (req.method === "OPTIONS") return new Response(null, { status: 405 });
+    if (!inner && req.method === "GET" && env.AUTH_MODE !== "local" && isPublicPage(path) && ctx?.exports?.PublicCache?.fetch) {
+      const publicRequest = new Request(req);
+      publicRequest.headers.delete("Authorization");
+      publicRequest.headers.delete("Cookie");
+      return ctx.exports.PublicCache.fetch(publicRequest);
+    }
     try {
       if (path === "/notes/api/admin" || path.startsWith("/notes/api/admin/"))
-        return adminApi(req, env, url, path);
+        return adminApi(req, env, url, path, ctx);
       if (/^\/notes\/api\/session\/?$/.test(path) && req.method === "GET")
         return json({ admin: Boolean(await adminIdentity(req, env)) });
       if (path === "/notes/api/categories" && req.method === "GET") {
@@ -37888,6 +37974,8 @@ var worker = {
         const item = await getNote(env.DB, id);
         return item ? json(item) : json({ error: "\u8CC7\u6599\u4E0D\u5B58\u5728" }, 404);
       }
+      if ((path === "/notes/" || path === "/notes") && req.method === "GET")
+        return publicNotesList(req, env);
       if (path === "/notes/feed.xml" && req.method === "GET") {
         const tag2 = url.searchParams.get("tag") || "";
         const data = await listNotes(env.DB, { pageSize: 100, tag: tag2 });
@@ -37947,9 +38035,33 @@ var worker = {
 var index_default = worker;
 
 // src/worker/index.js
+var index_default2 = index_default;
+var PublicCache = class extends WorkerEntrypoint {
+  static {
+    __name(this, "PublicCache");
+  }
+  async fetch(request) {
+    const response = await index_default.fetch(request, this.env, this.ctx, true);
+    const type = response.headers.get("Content-Type") || "";
+    if (response.status !== 200 || !/(text\/html|\/xml|\+xml)/i.test(type)) return response;
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", "public, max-age=0, s-maxage=300");
+    headers.set("Cache-Tag", "blog-notes-public");
+    return new Response(response.body, { status: response.status, headers });
+  }
+  async purgePublic() {
+    const result = await this.ctx.cache.purge({ purgeEverything: true });
+    if (!result.success) throw new Error("Notes Workers Cache purge failed: " + JSON.stringify(result.errors || []));
+    return true;
+  }
+};
 var BookmarkReferences = class extends WorkerEntrypoint {
   static {
     __name(this, "BookmarkReferences");
+  }
+  // Bookmarks publishes/edits/deletes referenced content: invalidate Notes HTML/RSS.
+  async invalidatePublic() {
+    return this.ctx.exports.PublicCache.purgePublic();
   }
   hasReference(id) {
     return hasBookmarkReference(this.env.DB, id);
@@ -37967,6 +38079,7 @@ var BookmarkReferences = class extends WorkerEntrypoint {
 };
 export {
   BookmarkReferences,
-  index_default as default
+  PublicCache,
+  index_default2 as default
 };
 //# sourceMappingURL=index.js.map
