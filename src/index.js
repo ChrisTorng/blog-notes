@@ -16,6 +16,7 @@ import { adminIdentity, allowedOrigin } from './auth.js'
 import { noteTitle, renderMarkdown } from './markdown.js'
 import { readLimitedText } from './http.js'
 import { publicNotePage } from './public-page.js'
+import { publicNotesList } from './public-list.js'
 import { bookmarkEmbeds } from './bookmark-embed.js'
 import { allRssXml, readBlogItems, rssXml, sitemapXml } from './feeds.js'
 
@@ -39,6 +40,10 @@ const xml = (body, mime = 'application/xml', hasReferences = false) =>
   })
 const siteUrl = (env) => (env.SITE_URL || 'https://christorng.idv.tw').replace(/\/$/, '')
 const noteSlug = /^[0-9]{8}-[a-f0-9]{10}$/
+const isPublicPage = path => path === '/notes/' || path === '/notes' ||
+  ['/notes/feed.xml','/notes/all/feed.xml','/notes/sitemap.xml'].includes(path) ||
+  /^\/notes\/[a-z0-9-]{1,100}\/?$/.test(path) &&
+  !['view','editor','admin','api','all','page'].includes(path.split('/')[2])
 
 
 async function readPayload(req) {
@@ -146,14 +151,21 @@ async function combinedData(env, page, tag = '') {
 }
 
 const worker = {
-  async fetch(req, env) {
+  async fetch(req, env, ctx, inner = false) {
     if (req.method === 'HEAD') {
-      const result = await worker.fetch(new Request(req, { method: 'GET' }), env)
+      const result = await worker.fetch(new Request(req, { method: 'GET' }), env, ctx, inner)
       return new Response(null, { status: result.status, headers: result.headers })
     }
     const url = new URL(req.url)
     const path = url.pathname
     if (req.method === 'OPTIONS') return new Response(null, { status: 405 })
+    if (!inner && req.method === 'GET' && env.AUTH_MODE !== 'local' &&
+        isPublicPage(path) && ctx?.exports?.PublicCache?.fetch) {
+      const publicRequest = new Request(req)
+      publicRequest.headers.delete('Authorization')
+      publicRequest.headers.delete('Cookie')
+      return ctx.exports.PublicCache.fetch(publicRequest)
+    }
     try {
       if (path === '/notes/api/admin' || path.startsWith('/notes/api/admin/'))
         return adminApi(req, env, url, path)
@@ -181,6 +193,8 @@ const worker = {
         const item = await getNote(env.DB, id)
         return item ? json(item) : json({ error: '資料不存在' }, 404)
       }
+      if ((path === '/notes/' || path === '/notes') && req.method === 'GET')
+        return publicNotesList(req, env)
       if (path === '/notes/feed.xml' && req.method === 'GET') {
         const tag = url.searchParams.get('tag') || ''
         const data = await listNotes(env.DB, { pageSize: 100, tag })
