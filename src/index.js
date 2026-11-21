@@ -16,6 +16,7 @@ import { adminIdentity, allowedOrigin } from './auth.js'
 import { noteTitle, renderMarkdown } from './markdown.js'
 import { readLimitedText } from './http.js'
 import { publicNotePage } from './public-page.js'
+import { publicNotesList } from './public-list.js'
 import { bookmarkEmbeds } from './bookmark-embed.js'
 import { allRssXml, readBlogItems, rssXml, sitemapXml } from './feeds.js'
 
@@ -39,6 +40,10 @@ const xml = (body, mime = 'application/xml', hasReferences = false) =>
   })
 const siteUrl = (env) => (env.SITE_URL || 'https://christorng.idv.tw').replace(/\/$/, '')
 const noteSlug = /^[0-9]{8}-[a-f0-9]{10}$/
+const isPublicPage = path => path === '/notes/' || path === '/notes' ||
+  ['/notes/feed.xml','/notes/all/feed.xml','/notes/sitemap.xml'].includes(path) ||
+  /^\/notes\/[a-z0-9-]{1,100}\/?$/.test(path) &&
+  !['view','editor','admin','api','all','page'].includes(path.split('/')[2])
 
 
 async function readPayload(req) {
@@ -53,7 +58,25 @@ async function readPayload(req) {
   }
 }
 
-async function adminApi(req, env, url, path) {
+// Report cache failures separately from successful D1 writes.
+async function invalidateAfterSave(env, ctx) {
+  if (env.AUTH_MODE === 'local') return null
+  try {
+    if (!ctx?.exports?.PublicCache?.purgePublic || !env.BOOKMARK_EDITOR?.invalidatePublic)
+      throw new Error('Public cache invalidation bindings unavailable')
+    await ctx.exports.PublicCache.purgePublic()
+    await env.BOOKMARK_EDITOR.invalidatePublic()
+    return null
+  } catch (error) {
+    console.error('Notes saved, but cache purge failed',String(error))
+    return json({
+      saved:true,code:'PUBLIC_CACHE_PURGE_FAILED',
+      error:'隨筆已儲存，但公開快取更新未完成。請稍後重新整理，或再次儲存以重試。'
+    },503)
+  }
+}
+
+async function adminApi(req, env, url, path, ctx) {
   const identity = await adminIdentity(req, env)
   if (!identity) return json({ error: '尚未通過管理員驗證' }, 401)
   if (!allowedOrigin(req, env)) return json({ error: '不允許跨來源修改' }, 403)
@@ -84,7 +107,8 @@ async function adminApi(req, env, url, path) {
     if (req.method === 'POST') {
       const raw = await readPayload(req)
       await ensurePublishedBookmark(env, raw)
-      return json(await createNote(env.DB, raw, env.AI), 201)
+      const created = await createNote(env.DB, raw, env.AI)
+      return await invalidateAfterSave(env, ctx) || json(created,201)
     }
   }
   const found = path.match(/^\/notes\/api\/admin\/([^/]+)\/?$/)
@@ -100,11 +124,13 @@ async function adminApi(req, env, url, path) {
       const raw = await readPayload(req)
       await ensurePublishedBookmark(env, raw)
       const item = await updateNote(env.DB, found[1], raw, env.AI)
-      return item ? json(item) : json({ error: '找不到資料' }, 404)
+      if (!item) return json({ error: '找不到資料' },404)
+      return await invalidateAfterSave(env, ctx) || json(item)
     }
     if (req.method === 'DELETE') {
       const deleted = await deleteNote(env.DB, found[1])
-      return deleted ? json({ ok: true }) : json({ error: '找不到資料' }, 404)
+      if (!deleted) return json({ error: '找不到資料' },404)
+      return await invalidateAfterSave(env, ctx) || json({ok:true})
     }
   }
   return json({ error: '不存在的管理 API' }, 404)
@@ -146,17 +172,24 @@ async function combinedData(env, page, tag = '') {
 }
 
 const worker = {
-  async fetch(req, env) {
+  async fetch(req, env, ctx, inner = false) {
     if (req.method === 'HEAD') {
-      const result = await worker.fetch(new Request(req, { method: 'GET' }), env)
+      const result = await worker.fetch(new Request(req, { method: 'GET' }), env, ctx, inner)
       return new Response(null, { status: result.status, headers: result.headers })
     }
     const url = new URL(req.url)
     const path = url.pathname
     if (req.method === 'OPTIONS') return new Response(null, { status: 405 })
+    if (!inner && req.method === 'GET' && env.AUTH_MODE !== 'local' &&
+        isPublicPage(path) && ctx?.exports?.PublicCache?.fetch) {
+      const publicRequest = new Request(req)
+      publicRequest.headers.delete('Authorization')
+      publicRequest.headers.delete('Cookie')
+      return ctx.exports.PublicCache.fetch(publicRequest)
+    }
     try {
       if (path === '/notes/api/admin' || path.startsWith('/notes/api/admin/'))
-        return adminApi(req, env, url, path)
+        return adminApi(req, env, url, path, ctx)
       if (/^\/notes\/api\/session\/?$/.test(path) && req.method === 'GET')
         return json({ admin: Boolean(await adminIdentity(req, env)) })
       if (path === '/notes/api/categories' && req.method === 'GET') {
@@ -181,6 +214,8 @@ const worker = {
         const item = await getNote(env.DB, id)
         return item ? json(item) : json({ error: '資料不存在' }, 404)
       }
+      if ((path === '/notes/' || path === '/notes') && req.method === 'GET')
+        return publicNotesList(req, env)
       if (path === '/notes/feed.xml' && req.method === 'GET') {
         const tag = url.searchParams.get('tag') || ''
         const data = await listNotes(env.DB, { pageSize: 100, tag })

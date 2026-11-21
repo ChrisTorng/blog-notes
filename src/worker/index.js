@@ -2,9 +2,35 @@ import { WorkerEntrypoint } from 'cloudflare:workers'
 import { hasBookmarkReference, publishedNotesByBookmark } from '../data.js'
 import { noteArticleHtml } from '../public-content.js'
 
-export { default } from '../index.js'
+import worker from '../index.js'
+
+export default worker
+
+// Dynamic public documents are cached independently of all admin/API traffic.
+export class PublicCache extends WorkerEntrypoint {
+  async fetch(request) {
+    const response = await worker.fetch(request, this.env, this.ctx, true)
+    const type = response.headers.get('Content-Type') || ''
+    if (response.status !== 200 || !/(text\/html|\/xml|\+xml)/i.test(type)) return response
+    const headers = new Headers(response.headers)
+    headers.set('Cache-Control', 'public, max-age=0, s-maxage=300')
+    headers.set('Cache-Tag', 'blog-notes-public')
+    return new Response(response.body, { status: response.status, headers })
+  }
+
+  async purgePublic() {
+    const result = await this.ctx.cache.purge({ purgeEverything: true })
+    if (!result.success) throw new Error('Notes Workers Cache purge failed: ' + JSON.stringify(result.errors || []))
+    return true
+  }
+}
 
 export class BookmarkReferences extends WorkerEntrypoint {
+  // Bookmarks publishes/edits/deletes referenced content: invalidate Notes HTML/RSS.
+  async invalidatePublic() {
+    return this.ctx.exports.PublicCache.purgePublic()
+  }
+
   hasReference(id) {
     return hasBookmarkReference(this.env.DB, id)
   }
