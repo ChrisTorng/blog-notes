@@ -40,15 +40,53 @@ export function slugify(title, fallback = 'entry') {
   return value || fallback;
 }
 
+
+// English-title slug for Notes. Chinese titles must be translated by Workers AI,
+// not romanized into Hanyu Pinyin; this work happens only on first publication.
+export function englishSlug(text) {
+  return String(text || '').normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'-')
+    .replace(/^-+|-+$/g,'').slice(0,100).replace(/-+$/g,'');
+}
+
+export async function translatedNoteSlug(title, ai) {
+  const source = String(title || '').trim();
+  if (!/\p{Script=Han}/u.test(source)) return englishSlug(source) || 'note';
+  if (!ai?.run) throw new Error('無法翻譯隨筆網址：尚未設定 Workers AI');
+  let result;
+  try {
+    result = await ai.run('@cf/google/gemma-4-26b-a4b-it', {
+      messages: [
+        {role:'system',content:'Translate Traditional Chinese note titles into short natural English article titles for use in URLs. Translate their MEANING; never use Chinese pinyin or transliteration. Keep technical proper nouns (e.g. eMudhra) unchanged. Reply ONLY with a natural English title, no quotes, no explanation.'},
+        {role:'user',content:source.slice(0,160)}
+      ],
+      chat_template_kwargs:{enable_thinking:false},
+      temperature:0,
+      max_tokens:140
+    });
+  } catch (error) {
+    console.error('Note URL translation failed',String(error));
+    throw new Error('無法翻譯隨筆網址，請稍後重試');
+  }
+  const output = result?.choices?.[0]?.message?.content ?? result?.response ?? '';
+  const candidate = String(output).trim().replace(/^["'“”]+|["'“”]+$/g,'');
+  if (/\p{Script=Han}/u.test(candidate) || /^i (cannot|can't|am unable)/i.test(candidate))
+    throw new Error('AI 未能產生有效的英文網址，請重試');
+  const slug = englishSlug(candidate);
+  if (slug.length < 4) throw new Error('AI 未能產生有效的英文網址，請重試');
+  return slug;
+}
+
 // Restrict the SQL table name to code-selected values, not request data.
 // Unique DB constraints resolve concurrent slug collisions safely.
-export async function ensureSlug(db, table, id, title) {
+export async function ensureSlug(db, table, id, title, preferredSlug = '') {
   if (table !== 'bookmarks' && table !== 'notes') throw new Error('Invalid slug table');
   const query = () => db.prepare('SELECT slug FROM ' + table + ' WHERE id=?').bind(id).first();
   const existing = await query();
   if (!existing) return null;
   if (existing.slug) return existing.slug;
-  const base = slugify(title, table === 'notes' ? 'note' : 'bookmark');
+  const base = preferredSlug ? englishSlug(preferredSlug) : slugify(title, table === 'notes' ? 'note' : 'bookmark');
+  if (!base) throw new Error('Invalid English URL slug');
   for (let n = 1; n <= 10000; n++) {
     const tail = n === 1 ? '' : '-' + n;
     const candidate = base.slice(0, 100 - tail.length).replace(/-+$/g, '') + tail;

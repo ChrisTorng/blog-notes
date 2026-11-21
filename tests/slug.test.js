@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { slugify, ensureSlug } from '../src/slug.js';
+import { slugify, ensureSlug, englishSlug, translatedNoteSlug } from '../src/slug.js';
 
 test('English article titles become short lowercase permanent URL slugs', () => {
   assert.equal(slugify('The Future of AI Agents'), 'the-future-of-ai-agents');
@@ -30,4 +30,21 @@ test('slug suffixes resolve uniqueness and URLs stay stable on edits', async () 
   assert.equal(await ensureSlug(db,'bookmarks','b','Same title'), 'same-title-2');
   assert.equal(await ensureSlug(db,'bookmarks','c','Same title'), 'same-title-3');
   assert.equal(await ensureSlug(db,'bookmarks','a','Changed title'), 'same-title');
+});
+
+test('Chinese note titles are semantically translated to English, never Pinyin', async () => {
+  let calls=0;
+  const ai={async run(model, input) {
+    calls++;
+    assert.equal(model,'@cf/google/gemma-4-26b-a4b-it');
+    assert.match(input.messages[1].content,/憑證/);
+    return {choices:[{message:{content:'Using an eMudhra Certificate as a Key Step in Hardware Hacking'}}]};
+  }};
+  assert.equal(await translatedNoteSlug('eMudhra 憑證可以利用來建立自己的硬體破解之關鍵步驟之一',ai),
+    'using-an-emudhra-certificate-as-a-key-step-in-hardware-hacking');
+  assert.equal(calls,1);
+  assert.equal(await translatedNoteSlug('Microsoft 365 Outage Lasted All Day',ai),'microsoft-365-outage-lasted-all-day');
+  assert.equal(calls,1);
+  assert.equal(englishSlug('Café de l’été'),'cafe-de-l-ete');
+  await assert.rejects(translatedNoteSlug('中文標題',null),/Workers AI/);
 });
