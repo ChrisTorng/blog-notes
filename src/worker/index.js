@@ -26,6 +26,11 @@ export class PublicCache extends WorkerEntrypoint {
 }
 
 export class BookmarkReferences extends WorkerEntrypoint {
+  // Bookmarks publishes/edits/deletes referenced content: invalidate Notes HTML/RSS.
+  async invalidatePublic() {
+    return this.ctx.exports.PublicCache.purgePublic()
+  }
+
   hasReference(id) {
     return hasBookmarkReference(this.env.DB, id)
   }
