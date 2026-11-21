@@ -25337,13 +25337,46 @@ function slugify(title, fallback = "entry") {
   return value || fallback;
 }
 __name(slugify, "slugify");
-async function ensureSlug(db, table3, id, title) {
+function englishSlug(text2) {
+  return String(text2 || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100).replace(/-+$/g, "");
+}
+__name(englishSlug, "englishSlug");
+async function translatedNoteSlug(title, ai) {
+  const source = String(title || "").trim();
+  if (!/\p{Script=Han}/u.test(source)) return englishSlug(source) || "note";
+  if (!ai?.run) throw new Error("\u7121\u6CD5\u7FFB\u8B6F\u96A8\u7B46\u7DB2\u5740\uFF1A\u5C1A\u672A\u8A2D\u5B9A Workers AI");
+  let result;
+  try {
+    result = await ai.run("@cf/google/gemma-4-26b-a4b-it", {
+      messages: [
+        { role: "system", content: "Translate Traditional Chinese note titles into short natural English article titles for use in URLs. Translate their MEANING; never use Chinese pinyin or transliteration. Keep technical proper nouns (e.g. eMudhra) unchanged. Reply ONLY with a natural English title, no quotes, no explanation." },
+        { role: "user", content: source.slice(0, 160) }
+      ],
+      chat_template_kwargs: { enable_thinking: false },
+      temperature: 0,
+      max_tokens: 140
+    });
+  } catch (error2) {
+    console.error("Note URL translation failed", String(error2));
+    throw new Error("\u7121\u6CD5\u7FFB\u8B6F\u96A8\u7B46\u7DB2\u5740\uFF0C\u8ACB\u7A0D\u5F8C\u91CD\u8A66");
+  }
+  const output = result?.choices?.[0]?.message?.content ?? result?.response ?? "";
+  const candidate = String(output).trim().replace(/^["'“”]+|["'“”]+$/g, "");
+  if (/\p{Script=Han}/u.test(candidate) || /^i (cannot|can't|am unable)/i.test(candidate))
+    throw new Error("AI \u672A\u80FD\u7522\u751F\u6709\u6548\u7684\u82F1\u6587\u7DB2\u5740\uFF0C\u8ACB\u91CD\u8A66");
+  const slug = englishSlug(candidate);
+  if (slug.length < 4) throw new Error("AI \u672A\u80FD\u7522\u751F\u6709\u6548\u7684\u82F1\u6587\u7DB2\u5740\uFF0C\u8ACB\u91CD\u8A66");
+  return slug;
+}
+__name(translatedNoteSlug, "translatedNoteSlug");
+async function ensureSlug(db, table3, id, title, preferredSlug = "") {
   if (table3 !== "bookmarks" && table3 !== "notes") throw new Error("Invalid slug table");
   const query = /* @__PURE__ */ __name(() => db.prepare("SELECT slug FROM " + table3 + " WHERE id=?").bind(id).first(), "query");
   const existing = await query();
   if (!existing) return null;
   if (existing.slug) return existing.slug;
-  const base2 = slugify(title, table3 === "notes" ? "note" : "bookmark");
+  const base2 = preferredSlug ? englishSlug(preferredSlug) : slugify(title, table3 === "notes" ? "note" : "bookmark");
+  if (!base2) throw new Error("Invalid English URL slug");
   for (let n = 1; n <= 1e4; n++) {
     const tail = n === 1 ? "" : "-" + n;
     const candidate = base2.slice(0, 100 - tail.length).replace(/-+$/g, "") + tail;
@@ -31223,7 +31256,7 @@ function checkNoteInput(value) {
   };
 }
 __name(checkNoteInput, "checkNoteInput");
-var fields = `n.id, n.slug, n.title, n.markdown, n.status, n.created_at, n.updated_at, n.published_at,
+var fields = `n.id, n.slug, n.rss_guid, n.title, n.markdown, n.status, n.created_at, n.updated_at, n.published_at,
   n.bookmark_id, n.bookmark_title, n.bookmark_url,
   COALESCE((SELECT json_group_array(tag_id) FROM note_tags WHERE note_id=n.id), '[]') AS tags`;
 function decode3(note) {
@@ -31256,6 +31289,12 @@ async function getNoteBySlug(db, slug) {
   return decode3(row);
 }
 __name(getNoteBySlug, "getNoteBySlug");
+async function getNoteByOldSlug(db, slug) {
+  const row = await db.prepare(`SELECT ${fields} FROM note_slug_redirects r JOIN notes n ON n.id=r.note_id
+    WHERE r.slug=? AND n.status='published' LIMIT 1`).bind(slug).first();
+  return decode3(row);
+}
+__name(getNoteByOldSlug, "getNoteByOldSlug");
 async function listNotes(db, { page = 1, pageSize = PAGE_SIZE, tag: tag2 = "", includeDraft = false } = {}) {
   const safePage = Math.max(1, Math.min(1e5, Number(page) || 1));
   const size = Math.max(1, Math.min(100, Number(pageSize) || PAGE_SIZE));
@@ -31288,8 +31327,9 @@ function newId(now) {
   return `${prefix}-${crypto.randomUUID().replaceAll("-", "").slice(0, 10)}`;
 }
 __name(newId, "newId");
-async function createNote(db, raw) {
+async function createNote(db, raw, ai = null) {
   const input = checkNoteInput(raw);
+  const preferredSlug = input.status === "published" ? await translatedNoteSlug(noteTitle(input), ai) : "";
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const id = newId(now);
   const statements = [
@@ -31315,15 +31355,18 @@ async function createNote(db, raw) {
     )
   );
   await db.batch(statements);
-  if (input.status === "published")
-    await ensureSlug(db, "notes", id, noteTitle(input));
+  if (input.status === "published") {
+    const slug = await ensureSlug(db, "notes", id, noteTitle(input), preferredSlug);
+    await db.prepare("UPDATE notes SET rss_guid=COALESCE(rss_guid, ?) WHERE id=?").bind("https://christorng.idv.tw/notes/" + encodeURIComponent(slug) + "/", id).run();
+  }
   return getNote(db, id, true);
 }
 __name(createNote, "createNote");
-async function updateNote(db, id, raw) {
+async function updateNote(db, id, raw, ai = null) {
   const input = checkNoteInput(raw);
   const current = await getNote(db, id, true);
   if (!current) return null;
+  const preferredSlug = input.status === "published" && !current.slug ? await translatedNoteSlug(noteTitle(input), ai) : "";
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const publishedAt = input.status === "published" ? current.published_at || now : null;
   const stmts = [
@@ -31336,8 +31379,10 @@ async function updateNote(db, id, raw) {
     )
   ];
   await db.batch(stmts);
-  if (input.status === "published")
-    await ensureSlug(db, "notes", id, noteTitle(input));
+  if (input.status === "published") {
+    const slug = await ensureSlug(db, "notes", id, noteTitle(input), preferredSlug);
+    await db.prepare("UPDATE notes SET rss_guid=COALESCE(rss_guid, ?) WHERE id=?").bind("https://christorng.idv.tw/notes/" + encodeURIComponent(slug) + "/", id).run();
+  }
   return getNote(db, id, true);
 }
 __name(updateNote, "updateNote");
@@ -31346,6 +31391,7 @@ async function deleteNote(db, id) {
   if (!current) return false;
   await db.batch([
     db.prepare("DELETE FROM note_tags WHERE note_id=?").bind(id),
+    db.prepare("DELETE FROM note_slug_redirects WHERE note_id=?").bind(id),
     db.prepare("DELETE FROM notes WHERE id=?").bind(id)
   ]);
   return true;
@@ -37547,9 +37593,10 @@ __name(pubDate, "pubDate");
 var cdata2 = /* @__PURE__ */ __name((html) => "<![CDATA[" + String(html).replaceAll("]]>", "]]]]><![CDATA[>") + "]]>", "cdata");
 function noteRssItem(n, siteUrl2, bookmarkHtmlById = {}) {
   const url = siteUrl2 + notePath(n);
+  const guid = n.rss_guid || url;
   const content = noteArticleHtml(n, siteUrl2, bookmarkHtmlById[n.bookmark_id] || "");
   const categories = n.tags.map((id) => "<category>" + htmlEscape(displayTag(id)) + "</category>").join("");
-  return "<item><title>" + htmlEscape(noteTitle(n)) + "</title><link>" + htmlEscape(url) + '</link><guid isPermaLink="true">' + htmlEscape(url) + "</guid><pubDate>" + pubDate(n.published_at || n.created_at) + "</pubDate><description>" + htmlEscape(content) + "</description><content:encoded>" + cdata2(content) + "</content:encoded>" + categories + "</item>";
+  return "<item><title>" + htmlEscape(noteTitle(n)) + "</title><link>" + htmlEscape(url) + '</link><guid isPermaLink="true">' + htmlEscape(guid) + "</guid><pubDate>" + pubDate(n.published_at || n.created_at) + "</pubDate><description>" + htmlEscape(content) + "</description><content:encoded>" + cdata2(content) + "</content:encoded>" + categories + "</item>";
 }
 __name(noteRssItem, "noteRssItem");
 function articleRssItem(item) {
@@ -37742,7 +37789,7 @@ async function adminApi(req, env, url, path) {
     if (req.method === "POST") {
       const raw = await readPayload(req);
       await ensurePublishedBookmark(env, raw);
-      return json(await createNote(env.DB, raw), 201);
+      return json(await createNote(env.DB, raw, env.AI), 201);
     }
   }
   const found = path.match(/^\/notes\/api\/admin\/([^/]+)\/?$/);
@@ -37756,7 +37803,7 @@ async function adminApi(req, env, url, path) {
         return json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
       const raw = await readPayload(req);
       await ensurePublishedBookmark(env, raw);
-      const item = await updateNote(env.DB, found[1], raw);
+      const item = await updateNote(env.DB, found[1], raw, env.AI);
       return item ? json(item) : json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
     }
     if (req.method === "DELETE") {
@@ -37877,7 +37924,7 @@ var worker = {
         const match2 = path.match(/^\/notes\/([a-z0-9-]{1,100})\/?$/);
         if (match2 && !["view", "editor", "admin", "api", "all", "page"].includes(match2[1])) {
           const key = match2[1];
-          const note = noteSlug.test(key) ? await getNote(env.DB, key) : await getNoteBySlug(env.DB, key);
+          const note = noteSlug.test(key) ? await getNote(env.DB, key) : await getNoteBySlug(env.DB, key) || await getNoteByOldSlug(env.DB, key);
           if (note?.slug) {
             const canonical = "/notes/" + note.slug + "/";
             if (url.pathname !== canonical) return Response.redirect(url.origin + canonical, 308);
