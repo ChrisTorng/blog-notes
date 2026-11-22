@@ -37817,21 +37817,36 @@ async function readPayload(req) {
   }
 }
 __name(readPayload, "readPayload");
-async function invalidateAfterSave(env, ctx) {
+async function invalidateAfterSave(env, ctx, savedItem) {
   if (env.AUTH_MODE === "local") return null;
   try {
     if (!ctx?.exports?.PublicCache?.purgePublic || !env.BOOKMARK_EDITOR?.invalidatePublic)
       throw new Error("Public cache invalidation bindings unavailable");
-    await ctx.exports.PublicCache.purgePublic();
-    await env.BOOKMARK_EDITOR.invalidatePublic();
+    const purge = (async () => {
+      await ctx.exports.PublicCache.purgePublic();
+      await env.BOOKMARK_EDITOR.invalidatePublic();
+    })();
+    ctx.waitUntil?.(purge.catch((error2) => console.error("Notes public cache purge eventually failed", String(error2))));
+    let timeout;
+    try {
+      await Promise.race([
+        purge,
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error("Cache purge timed out")), 8e3);
+        })
+      ]);
+    } finally {
+      clearTimeout(timeout);
+    }
     return null;
   } catch (error2) {
-    console.error("Notes saved, but cache purge failed", String(error2));
+    console.error("Notes saved, but cache purge incomplete", String(error2));
     return json({
+      ...savedItem,
       saved: true,
       code: "PUBLIC_CACHE_PURGE_FAILED",
-      error: "\u96A8\u7B46\u5DF2\u5132\u5B58\uFF0C\u4F46\u516C\u958B\u5FEB\u53D6\u66F4\u65B0\u672A\u5B8C\u6210\u3002\u8ACB\u7A0D\u5F8C\u91CD\u65B0\u6574\u7406\uFF0C\u6216\u518D\u6B21\u5132\u5B58\u4EE5\u91CD\u8A66\u3002"
-    }, 503);
+      warning: "\u96A8\u7B46\u5DF2\u5132\u5B58\uFF0C\u4F46\u516C\u958B\u5FEB\u53D6\u5C1A\u672A\u5B8C\u6210\u66F4\u65B0\uFF1B\u516C\u958B\u9801\u53EF\u80FD\u66AB\u6642\u986F\u793A\u820A\u5167\u5BB9\u3002"
+    }, 202);
   }
 }
 __name(invalidateAfterSave, "invalidateAfterSave");
@@ -37867,7 +37882,7 @@ async function adminApi(req, env, url, path, ctx) {
       const raw = await readPayload(req);
       await ensurePublishedBookmark(env, raw);
       const created = await createNote(env.DB, raw, env.AI);
-      return await invalidateAfterSave(env, ctx) || json(created, 201);
+      return await invalidateAfterSave(env, ctx, created) || json(created, 201);
     }
   }
   const found = path.match(/^\/notes\/api\/admin\/([^/]+)\/?$/);
@@ -37883,12 +37898,12 @@ async function adminApi(req, env, url, path, ctx) {
       await ensurePublishedBookmark(env, raw);
       const item = await updateNote(env.DB, found[1], raw, env.AI);
       if (!item) return json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
-      return await invalidateAfterSave(env, ctx) || json(item);
+      return await invalidateAfterSave(env, ctx, item) || json(item);
     }
     if (req.method === "DELETE") {
       const deleted = await deleteNote(env.DB, found[1]);
       if (!deleted) return json({ error: "\u627E\u4E0D\u5230\u8CC7\u6599" }, 404);
-      return await invalidateAfterSave(env, ctx) || json({ ok: true });
+      return await invalidateAfterSave(env, ctx, { ok: true }) || json({ ok: true });
     }
   }
   return json({ error: "\u4E0D\u5B58\u5728\u7684\u7BA1\u7406 API" }, 404);
