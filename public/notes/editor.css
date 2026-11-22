@@ -410,3 +410,7 @@ dialog h2 {
 #preview .bookmark-embed .text-xs{font-size:.8rem}
 #preview .bookmark-embed .text-sm{font-size:.87rem}
 #preview .bookmark-embed a{overflow-wrap:anywhere}
+
+/* Show ambiguous CommonMark quote continuations before publication. */
+#preview .markdown-warning{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0;padding:10px 12px;border:1px solid #c78c35;border-radius:7px;color:var(--ink);font-size:.82rem;line-height:1.5;background:color-mix(in srgb,var(--surface) 85%,#eab308)}
+#preview .markdown-warning button{border-color:#c78c35;font-weight:600;padding:4px 8px;white-space:normal}
