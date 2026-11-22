@@ -130,6 +130,20 @@ async function api(path, method = 'GET', data, signal) {
   }
   return value
 }
+// CommonMark permits a line without ">" to continue an earlier blockquote.
+// The title deliberately uses only the first non-empty source line, so call
+// attention to that otherwise hard-to-spot difference in the live preview.
+function unmarkedQuoteContinuation(markdown) {
+  const lines = markdown.split(/\r?\n/)
+  for (let i = 1; i < lines.length; i++) {
+    if (
+      /^ {0,3}>\s*\S/.test(lines[i - 1]) &&
+      /^\s*\S/.test(lines[i]) &&
+      !/^ {0,3}(?:>|#{1,6}\s|[-*+]\s|\d+[.)]\s|`{3,}|~{3,})/.test(lines[i])
+    ) return i
+  }
+  return -1
+}
 async function preview() {
   const version = ++state.preview
   previewRequest?.abort()
@@ -150,10 +164,44 @@ async function preview() {
     $('previewTitle').textContent = result.title
     const pane = $('preview')
     pane.replaceChildren()
-    if (bookmarkRef?.id) {
-      const frame = document.createElement('aside')
+
+    const quoteLine = unmarkedQuoteContinuation($('markdown').value)
+    if (quoteLine >= 0) {
+      const warning = document.createElement('div')
+      warning.className = 'markdown-warning'
+      warning.setAttribute('role', 'status')
+      warning.append(
+        document.createTextNode(
+          `第 ${quoteLine + 1} 行未加 >，但仍會延續前一行引文。標題只取第一個非空白原始行；若此行應為普通段落，請插入空白行。`
+        )
+      )
+      const fix = document.createElement('button')
+      fix.type = 'button'
+      fix.textContent = '插入空白行'
+      fix.addEventListener('click', () => {
+        const lines = $('markdown').value.split(/\r?\n/)
+        if (unmarkedQuoteContinuation($('markdown').value) !== quoteLine) return
+        lines.splice(quoteLine, 0, '')
+        $('markdown').value = lines.join('\n')
+        remember()
+        schedulePreview()
+      })
+      warning.append(fix)
+      pane.append(warning)
+    }
+
+    // Display Markdown before the potentially slow linked bookmark request.
+    const frame = bookmarkRef?.id ? document.createElement('aside') : null
+    if (frame) {
       frame.className = 'bookmark-embed'
       frame.setAttribute('aria-label', '引用書籤')
+      frame.textContent = '正在載入引用書籤……'
+      pane.append(frame)
+    }
+    const text = document.createElement('div')
+    text.innerHTML = result.html // Notes API disables raw HTML and unsafe links.
+    pane.append(text)
+    if (frame) {
       try {
         const bookmark = await api(
           '/notes/api/admin/bookmarks/' + encodeURIComponent(bookmarkRef.id),
@@ -161,19 +209,15 @@ async function preview() {
           undefined,
           previewRequest.signal
         )
+        if (version !== state.preview) return
         const content = document.createElement('div')
         content.innerHTML = bookmark.html
-        if (version !== state.preview) return
-        frame.append(content)
+        frame.replaceChildren(content)
       } catch (error) {
         if (error.name === 'AbortError' || version !== state.preview) return
         frame.textContent = error.message
       }
-      pane.append(frame)
     }
-    const text = document.createElement('div')
-    text.innerHTML = result.html // Notes API disables raw HTML and unsafe links.
-    pane.append(text);
   } catch (error) {
     if (error.name !== 'AbortError' && version === state.preview)
       notice(error.message, true)
