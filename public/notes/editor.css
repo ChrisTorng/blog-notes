@@ -331,14 +331,20 @@ textarea:focus {
     display: flex;
     flex: none;
     flex-direction: column;
+    height: auto;
     min-height: 0;
+    max-height: none;
+    overflow: visible;
     gap: 10px;
   }
   .compose-pane,
   .preview-pane {
     display: flex;
+    flex: none;
     flex-direction: column;
+    height: auto;
     min-height: 0;
+    max-height: none;
     overflow: visible;
   }
   .pane-label {
@@ -348,19 +354,26 @@ textarea:focus {
   .title-field {
     flex: none;
     min-height: 68px;
+    max-height: none;
     height: auto;
     overflow: visible;
   }
+  /* A constant editing height, independent of the browser/keyboard viewport. */
   .compose-pane textarea {
-    flex: none;
-    height: 40dvh;
-    min-height: 220px;
-    max-height: 460px;
+    flex: 0 0 600px;
+    height: 600px;
+    min-height: 600px;
+    max-height: 600px;
     overflow-y: auto;
   }
-  .preview-pane .prose {
-    overflow: visible;
+  /* The complete rendered Markdown and referenced bookmark occupy normal page
+     space. The page scrolls; the preview must never become a scroll viewport. */
+  .preview-pane #preview {
+    flex: none;
+    height: auto;
     min-height: 0;
+    max-height: none;
+    overflow: visible;
   }
   .preview-pane .title-field h1 {
     font-size: 1.1rem;
