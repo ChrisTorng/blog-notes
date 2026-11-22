@@ -58,21 +58,40 @@ async function readPayload(req) {
   }
 }
 
-// Report cache failures separately from successful D1 writes.
-async function invalidateAfterSave(env, ctx) {
+// Cache purging happens *after* D1 commits. A slow or failed purge must
+// never be reported as a failed save (or prompt the user to create duplicates).
+async function invalidateAfterSave(env, ctx, savedItem) {
   if (env.AUTH_MODE === 'local') return null
   try {
     if (!ctx?.exports?.PublicCache?.purgePublic || !env.BOOKMARK_EDITOR?.invalidatePublic)
       throw new Error('Public cache invalidation bindings unavailable')
-    await ctx.exports.PublicCache.purgePublic()
-    await env.BOOKMARK_EDITOR.invalidatePublic()
+    const purge = (async () => {
+      await ctx.exports.PublicCache.purgePublic()
+      await env.BOOKMARK_EDITOR.invalidatePublic()
+    })()
+    // Keep an outstanding purge alive if it exceeds the bounded response wait.
+    ctx.waitUntil?.(purge.catch(error =>
+      console.error('Notes public cache purge eventually failed', String(error))))
+    let timeout
+    try {
+      await Promise.race([
+        purge,
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error('Cache purge timed out')), 8000)
+        }),
+      ])
+    } finally {
+      clearTimeout(timeout)
+    }
     return null
   } catch (error) {
-    console.error('Notes saved, but cache purge failed',String(error))
+    console.error('Notes saved, but cache purge incomplete', String(error))
     return json({
-      saved:true,code:'PUBLIC_CACHE_PURGE_FAILED',
-      error:'隨筆已儲存，但公開快取更新未完成。請稍後重新整理，或再次儲存以重試。'
-    },503)
+      ...savedItem,
+      saved: true,
+      code: 'PUBLIC_CACHE_PURGE_FAILED',
+      warning: '隨筆已儲存，但公開快取尚未完成更新；公開頁可能暫時顯示舊內容。',
+    }, 202)
   }
 }
 
@@ -108,7 +127,7 @@ async function adminApi(req, env, url, path, ctx) {
       const raw = await readPayload(req)
       await ensurePublishedBookmark(env, raw)
       const created = await createNote(env.DB, raw, env.AI)
-      return await invalidateAfterSave(env, ctx) || json(created,201)
+      return await invalidateAfterSave(env, ctx, created) || json(created,201)
     }
   }
   const found = path.match(/^\/notes\/api\/admin\/([^/]+)\/?$/)
@@ -125,12 +144,12 @@ async function adminApi(req, env, url, path, ctx) {
       await ensurePublishedBookmark(env, raw)
       const item = await updateNote(env.DB, found[1], raw, env.AI)
       if (!item) return json({ error: '找不到資料' },404)
-      return await invalidateAfterSave(env, ctx) || json(item)
+      return await invalidateAfterSave(env, ctx, item) || json(item)
     }
     if (req.method === 'DELETE') {
       const deleted = await deleteNote(env.DB, found[1])
       if (!deleted) return json({ error: '找不到資料' },404)
-      return await invalidateAfterSave(env, ctx) || json({ok:true})
+      return await invalidateAfterSave(env, ctx, {ok:true}) || json({ok:true})
     }
   }
   return json({ error: '不存在的管理 API' }, 404)
