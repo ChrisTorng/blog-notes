@@ -122,7 +122,12 @@ async function api(path, method = 'GET', data, signal) {
     ...(data === undefined ? {} : { body: JSON.stringify(data) }),
   })
   const value = await response.json()
-  if (!response.ok) throw new Error(value.error || `HTTP ${response.status}`)
+  if (!response.ok) {
+    const error = new Error(value.error || `HTTP ${response.status}`)
+    error.saved = value.saved === true
+    error.code = value.code
+    throw error
+  }
   return value
 }
 async function preview() {
@@ -334,11 +339,38 @@ async function save(status) {
     updateUrl()
     $('noteStatus').textContent =
       item.status === 'published' ? '已發佈' : '草稿'
-    await refreshList()
-    await preview()
-    notice(item.status === 'published' ? '已儲存並發佈' : '已儲存為草稿')
+    // The database result is authoritative. Do not hide publication success
+    // behind secondary history/preview network requests.
+    notice(
+      item.warning ||
+        (item.status === 'published' ? '已儲存並發佈' : '已儲存為草稿'),
+      Boolean(item.warning)
+    )
+    try {
+      await refreshList()
+    } catch (error) {
+      notice('已儲存，但歷史清單更新失敗：' + error.message, true)
+    }
+    // Bookmark previews can be slow; they must not delay publication feedback.
+    void preview()
   } catch (error) {
-    notice(error.message, true)
+    if (error.saved && state.id) {
+      // A cache purge can fail after D1 has committed the note. Recover the
+      // persisted state instead of implying a failed write or inviting retries.
+      try {
+        const item = await api(`/notes/api/admin/${state.id}/`)
+        state.status = item.status
+        state.baseline = editableSnapshot(values())
+        actionLabels()
+        $('noteStatus').textContent =
+          item.status === 'published' ? '已發佈' : '草稿'
+        notice('資料已儲存，但公開快取更新未完成；請稍後重新整理公開頁。', true)
+      } catch {
+        notice(error.message, true)
+      }
+    } else {
+      notice(error.message, true)
+    }
   } finally {
     busy(false)
   }
