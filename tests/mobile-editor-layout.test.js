@@ -12,11 +12,11 @@ const declaration = (selector) => {
   return mobile.slice(start, mobile.indexOf('}', start))
 }
 
-test('mobile Markdown textarea uses a fixed 600px height, not viewport units', () => {
+test('mobile Markdown textarea uses a fixed 320px height, not viewport units', () => {
   const textarea = declaration('.compose-pane textarea')
-  assert.match(textarea, /height: 600px;/)
-  assert.match(textarea, /min-height: 600px;/)
-  assert.match(textarea, /max-height: 600px;/)
+  assert.match(textarea, /height: 320px;/)
+  assert.match(textarea, /min-height: 320px;/)
+  assert.match(textarea, /max-height: 320px;/)
   assert.match(textarea, /overflow-y: auto;/)
   assert.doesNotMatch(textarea, /dvh|vh|vw/)
 })
