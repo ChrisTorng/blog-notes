@@ -325,16 +325,46 @@ textarea:focus {
   #authStatus {
     margin-left: auto;
   }
+  /* Keep the preview in document flow: a 50dvh fixed pane creates
+     nested touch-scrolling and hides the inline reference and Markdown. */
   .split-view {
+    display: flex;
     flex: none;
-    grid-template-columns: 1fr;
-    grid-template-rows: 50dvh 50dvh;
-    min-height: 560px;
+    flex-direction: column;
+    min-height: 0;
     gap: 10px;
   }
   .compose-pane,
   .preview-pane {
-    grid-template-rows: 34px 90px 24px minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: visible;
+  }
+  .pane-label {
+    min-height: 34px;
+    flex: none;
+  }
+  .title-field {
+    flex: none;
+    min-height: 68px;
+    height: auto;
+    overflow: visible;
+  }
+  .compose-pane textarea {
+    flex: none;
+    height: 40dvh;
+    min-height: 220px;
+    max-height: 460px;
+    overflow-y: auto;
+  }
+  .preview-pane .prose {
+    overflow: visible;
+    min-height: 0;
+  }
+  .preview-pane .title-field h1 {
+    font-size: 1.1rem;
+    line-height: 1.45;
   }
   .tag-select {
     flex-basis: 100%;
