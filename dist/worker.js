@@ -31210,8 +31210,28 @@ function plainText(markdown) {
   return text2.join("").replace(/\s+/g, " ").trim();
 }
 __name(plainText, "plainText");
+function automaticNoteTitle(markdown) {
+  const first = String(markdown || "").split(/\r?\n/).find((line) => line.trim()) || "";
+  const value = plainText(first).replace(/\s+/g, " ").trim();
+  if (!value) return "\u96A8\u7B46";
+  const chars = Array.from(value);
+  const limit = 38;
+  const sentence = chars.findIndex((ch) => /[。！？!?]/.test(ch));
+  if (sentence >= 11 && sentence < limit)
+    return chars.slice(0, sentence + 1).join("").replace(/[。！？!?]+$/, "");
+  if (chars.length <= limit) return value;
+  const slice = chars.slice(0, limit).join("");
+  const cut = Math.max(
+    slice.lastIndexOf("\uFF0C"),
+    slice.lastIndexOf("\uFF1B"),
+    slice.lastIndexOf("\u3001"),
+    slice.lastIndexOf(" ")
+  );
+  return (cut >= 26 ? slice.slice(0, cut) : slice).trimEnd() + "\u2026";
+}
+__name(automaticNoteTitle, "automaticNoteTitle");
 function noteTitle(note) {
-  return note.title || note.bookmark_title || plainText(String(note.markdown || "").split(/\r?\n/).find((line) => line.trim()) || "").slice(0, 160) || "\u96A8\u7B46";
+  return note.title || note.bookmark_title || automaticNoteTitle(note.markdown);
 }
 __name(noteTitle, "noteTitle");
 function notePath(note) {
