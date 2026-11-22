@@ -59,11 +59,34 @@ export function plainText(markdown) {
   return text.join('').replace(/\s+/g, ' ').trim()
 }
 
+// Titles remain optional in storage. Derive a concise, deterministic
+// presentation title for previews, public pages and RSS from the first
+// non-empty source line; never alter user-supplied titles or persisted text.
+export function automaticNoteTitle(markdown) {
+  const first = String(markdown || '').split(/\r?\n/).find(line => line.trim()) || ''
+  const value = plainText(first).replace(/\s+/g, ' ').trim()
+  if (!value) return '隨筆'
+  const chars = Array.from(value)
+  const limit = 38
+  const sentence = chars.findIndex(ch => /[。！？!?]/.test(ch))
+  if (sentence >= 11 && sentence < limit)
+    return chars.slice(0, sentence + 1).join('').replace(/[。！？!?]+$/, '')
+  if (chars.length <= limit) return value
+  const slice = chars.slice(0, limit).join('')
+  // Prefer a nearby punctuation/word boundary, but avoid overly short labels.
+  const cut = Math.max(
+    slice.lastIndexOf('，'),
+    slice.lastIndexOf('；'),
+    slice.lastIndexOf('、'),
+    slice.lastIndexOf(' '),
+  )
+  return (cut >= 26 ? slice.slice(0, cut) : slice).trimEnd() + '…'
+}
+
 export function noteTitle(note) {
   return note.title ||
     note.bookmark_title ||
-    plainText(String(note.markdown || '').split(/\r?\n/).find((line) => line.trim()) || '').slice(0, 160) ||
-    '隨筆'
+    automaticNoteTitle(note.markdown)
 }
 
 export function notePath(note) {
