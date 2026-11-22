@@ -122,8 +122,27 @@ async function api(path, method = 'GET', data, signal) {
     ...(data === undefined ? {} : { body: JSON.stringify(data) }),
   })
   const value = await response.json()
-  if (!response.ok) throw new Error(value.error || `HTTP ${response.status}`)
+  if (!response.ok) {
+    const error = new Error(value.error || `HTTP ${response.status}`)
+    error.saved = value.saved === true
+    error.code = value.code
+    throw error
+  }
   return value
+}
+// CommonMark permits a line without ">" to continue an earlier blockquote.
+// The title deliberately uses only the first non-empty source line, so call
+// attention to that otherwise hard-to-spot difference in the live preview.
+function unmarkedQuoteContinuation(markdown) {
+  const lines = markdown.split(/\r?\n/)
+  for (let i = 1; i < lines.length; i++) {
+    if (
+      /^ {0,3}>\s*\S/.test(lines[i - 1]) &&
+      /^\s*\S/.test(lines[i]) &&
+      !/^ {0,3}(?:>|#{1,6}\s|[-*+]\s|\d+[.)]\s|`{3,}|~{3,})/.test(lines[i])
+    ) return i
+  }
+  return -1
 }
 async function preview() {
   const version = ++state.preview
@@ -145,10 +164,44 @@ async function preview() {
     $('previewTitle').textContent = result.title
     const pane = $('preview')
     pane.replaceChildren()
-    if (bookmarkRef?.id) {
-      const frame = document.createElement('aside')
+
+    const quoteLine = unmarkedQuoteContinuation($('markdown').value)
+    if (quoteLine >= 0) {
+      const warning = document.createElement('div')
+      warning.className = 'markdown-warning'
+      warning.setAttribute('role', 'status')
+      warning.append(
+        document.createTextNode(
+          `第 ${quoteLine + 1} 行未加 >，但仍會延續前一行引文。標題只取第一個非空白原始行；若此行應為普通段落，請插入空白行。`
+        )
+      )
+      const fix = document.createElement('button')
+      fix.type = 'button'
+      fix.textContent = '插入空白行'
+      fix.addEventListener('click', () => {
+        const lines = $('markdown').value.split(/\r?\n/)
+        if (unmarkedQuoteContinuation($('markdown').value) !== quoteLine) return
+        lines.splice(quoteLine, 0, '')
+        $('markdown').value = lines.join('\n')
+        remember()
+        schedulePreview()
+      })
+      warning.append(fix)
+      pane.append(warning)
+    }
+
+    // Display Markdown before the potentially slow linked bookmark request.
+    const frame = bookmarkRef?.id ? document.createElement('aside') : null
+    if (frame) {
       frame.className = 'bookmark-embed'
       frame.setAttribute('aria-label', '引用書籤')
+      frame.textContent = '正在載入引用書籤……'
+      pane.append(frame)
+    }
+    const text = document.createElement('div')
+    text.innerHTML = result.html // Notes API disables raw HTML and unsafe links.
+    pane.append(text)
+    if (frame) {
       try {
         const bookmark = await api(
           '/notes/api/admin/bookmarks/' + encodeURIComponent(bookmarkRef.id),
@@ -156,19 +209,15 @@ async function preview() {
           undefined,
           previewRequest.signal
         )
+        if (version !== state.preview) return
         const content = document.createElement('div')
         content.innerHTML = bookmark.html
-        if (version !== state.preview) return
-        frame.append(content)
+        frame.replaceChildren(content)
       } catch (error) {
         if (error.name === 'AbortError' || version !== state.preview) return
         frame.textContent = error.message
       }
-      pane.append(frame)
     }
-    const text = document.createElement('div')
-    text.innerHTML = result.html // Notes API disables raw HTML and unsafe links.
-    pane.append(text);
   } catch (error) {
     if (error.name !== 'AbortError' && version === state.preview)
       notice(error.message, true)
@@ -334,11 +383,38 @@ async function save(status) {
     updateUrl()
     $('noteStatus').textContent =
       item.status === 'published' ? '已發佈' : '草稿'
-    await refreshList()
-    await preview()
-    notice(item.status === 'published' ? '已儲存並發佈' : '已儲存為草稿')
+    // The database result is authoritative. Do not hide publication success
+    // behind secondary history/preview network requests.
+    notice(
+      item.warning ||
+        (item.status === 'published' ? '已儲存並發佈' : '已儲存為草稿'),
+      Boolean(item.warning)
+    )
+    try {
+      await refreshList()
+    } catch (error) {
+      notice('已儲存，但歷史清單更新失敗：' + error.message, true)
+    }
+    // Bookmark previews can be slow; they must not delay publication feedback.
+    void preview()
   } catch (error) {
-    notice(error.message, true)
+    if (error.saved && state.id) {
+      // A cache purge can fail after D1 has committed the note. Recover the
+      // persisted state instead of implying a failed write or inviting retries.
+      try {
+        const item = await api(`/notes/api/admin/${state.id}/`)
+        state.status = item.status
+        state.baseline = editableSnapshot(values())
+        actionLabels()
+        $('noteStatus').textContent =
+          item.status === 'published' ? '已發佈' : '草稿'
+        notice('資料已儲存，但公開快取更新未完成；請稍後重新整理公開頁。', true)
+      } catch {
+        notice(error.message, true)
+      }
+    } else {
+      notice(error.message, true)
+    }
   } finally {
     busy(false)
   }

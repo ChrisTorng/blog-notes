@@ -325,16 +325,46 @@ textarea:focus {
   #authStatus {
     margin-left: auto;
   }
+  /* Keep the preview in document flow: a 50dvh fixed pane creates
+     nested touch-scrolling and hides the inline reference and Markdown. */
   .split-view {
+    display: flex;
     flex: none;
-    grid-template-columns: 1fr;
-    grid-template-rows: 50dvh 50dvh;
-    min-height: 560px;
+    flex-direction: column;
+    min-height: 0;
     gap: 10px;
   }
   .compose-pane,
   .preview-pane {
-    grid-template-rows: 34px 90px 24px minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: visible;
+  }
+  .pane-label {
+    min-height: 34px;
+    flex: none;
+  }
+  .title-field {
+    flex: none;
+    min-height: 68px;
+    height: auto;
+    overflow: visible;
+  }
+  .compose-pane textarea {
+    flex: none;
+    height: 40dvh;
+    min-height: 220px;
+    max-height: 460px;
+    overflow-y: auto;
+  }
+  .preview-pane .prose {
+    overflow: visible;
+    min-height: 0;
+  }
+  .preview-pane .title-field h1 {
+    font-size: 1.1rem;
+    line-height: 1.45;
   }
   .tag-select {
     flex-basis: 100%;
@@ -380,3 +410,7 @@ dialog h2 {
 #preview .bookmark-embed .text-xs{font-size:.8rem}
 #preview .bookmark-embed .text-sm{font-size:.87rem}
 #preview .bookmark-embed a{overflow-wrap:anywhere}
+
+/* Show ambiguous CommonMark quote continuations before publication. */
+#preview .markdown-warning{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0;padding:10px 12px;border:1px solid #c78c35;border-radius:7px;color:var(--ink);font-size:.82rem;line-height:1.5;background:color-mix(in srgb,var(--surface) 85%,#eab308)}
+#preview .markdown-warning button{border-color:#c78c35;font-weight:600;padding:4px 8px;white-space:normal}
