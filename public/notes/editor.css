@@ -303,7 +303,7 @@ textarea:focus {
   }
   .workspace {
     height: auto;
-    min-height: 100dvh;
+    min-height: 0;
     padding: 10px;
     gap: 10px;
   }
@@ -358,12 +358,13 @@ textarea:focus {
     height: auto;
     overflow: visible;
   }
-  /* A constant editing height, independent of the browser/keyboard viewport. */
+  /* Fixed CSS-pixel height: fits the Android keyboard-visible area and
+     never shrinks/jumps when the virtual keyboard opens or closes. */
   .compose-pane textarea {
-    flex: 0 0 600px;
-    height: 600px;
-    min-height: 600px;
-    max-height: 600px;
+    flex: 0 0 320px;
+    height: 320px;
+    min-height: 320px;
+    max-height: 320px;
     overflow-y: auto;
   }
   /* The complete rendered Markdown and referenced bookmark occupy normal page
