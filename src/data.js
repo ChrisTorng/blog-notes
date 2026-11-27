@@ -227,3 +227,10 @@ export async function exportNoteBatch(db, afterId = '') {
     .all()
   return rows.results.map(decode)
 }
+
+// Keep the same chronological ordering and tie-breakers as the public list.
+export async function adjacentNotes(db,note) {
+  const lookup=(comparison,order)=>db.prepare(`SELECT id,slug,title,markdown FROM notes WHERE status='published' AND slug IS NOT NULL AND slug<>'' AND (COALESCE(published_at,created_at),created_at,id) ${comparison} (?,?,?) ORDER BY COALESCE(published_at,created_at) ${order},created_at ${order},id ${order} LIMIT 1`).bind(note.published_at||note.created_at,note.created_at,note.id).first();
+  const [prev,next]=await Promise.all([lookup('<','DESC'),lookup('>','ASC')]);
+  return {prev,next};
+}

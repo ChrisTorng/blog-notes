@@ -1,14 +1,14 @@
 const bookmarkIdPattern = /^[0-9a-f-]{36}$/
 // The service binding calls Bookmarks' public canonical HTML API directly.
 // No stored snapshot or custom HTML renderer is kept by Notes.
-export async function bookmarkEmbeds(notes, env, origin) {
+export async function bookmarkEmbeds(notes, env, origin, {showReading=true}={}) {
   const ids = [...new Set(notes.map(note => note.bookmark_id)
     .filter(id => id && bookmarkIdPattern.test(id)))]
   if (!ids.length) return {}
   if (!env.BOOKMARKS) throw new Error('BOOKMARKS service binding is missing')
   const results = await Promise.all(ids.map(async id => {
     const response = await env.BOOKMARKS.fetch(
-      new Request('https://bookmarks.internal/bookmarks/api/embed/' + id,
+      new Request('https://bookmarks.internal/bookmarks/api/embed/' + id + (showReading ? '' : '?reading=0'),
         {headers: {'Accept': 'text/html'}})
     )
     if (response.status === 404)

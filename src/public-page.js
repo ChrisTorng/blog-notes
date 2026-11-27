@@ -1,14 +1,20 @@
-import { htmlEscape as esc, noteTitle, plainText } from './markdown.js';
+import { htmlEscape as esc, noteTitle, notePath, plainText } from './markdown.js';
 import { noteArticleHtml } from './public-content.js';
 
-export async function publicNotePage(request, note, bookmarkHtml = '') {
+function adjacentNavigation({prev,next}={}) {
+  if (!prev && !next) return '';
+  const link=(item,direction)=>item ? '<a href="'+esc(notePath(item))+'" rel="'+direction+'" class="min-w-0 break-words '+(direction==='next'?'text-right ':'')+'text-primary-500 hover:text-primary-600">'+(direction==='prev'?'← 上一篇：'+esc(noteTitle(item)):'下一篇：'+esc(noteTitle(item))+' →')+'</a>' : '<span></span>';
+  return '<nav aria-label="上下一篇" class="my-3 grid grid-cols-2 gap-3 text-sm">'+link(prev,'prev')+link(next,'next')+'</nav>';
+}
+
+export async function publicNotePage(request, note, bookmarkHtml = '', adjacent={}) {
   const site = 'ChrisTorng 學習天地';
   const origin = new URL(request.url).origin;
   const canonical = origin + '/notes/' + encodeURIComponent(note.slug) + '/';
   const title = noteTitle(note);
   const text = plainText(note.markdown).slice(0, 180);
   const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">← 隨筆列表</a>'+
-    '<div class="mt-4">'+noteArticleHtml(note,origin,bookmarkHtml)+'</div></section>';
+    adjacentNavigation(adjacent)+'<div class="mt-4">'+noteArticleHtml(note,origin,bookmarkHtml)+'</div>'+adjacentNavigation(adjacent)+'</section>';
   const jsonld = JSON.stringify({
     '@context':'https://schema.org','@type':'BlogPosting',
     headline:title,datePublished:note.published_at||note.created_at,

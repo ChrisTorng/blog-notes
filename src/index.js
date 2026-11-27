@@ -6,6 +6,7 @@ import {
   getNote,
   getNoteBySlug,
   getNoteByOldSlug,
+  adjacentNotes,
   listNotes,
   PAGE_SIZE,
   pageNumber,
@@ -279,8 +280,8 @@ const worker = {
           if (note?.slug) {
             const canonical = '/notes/' + note.slug + '/'
             if (url.pathname !== canonical) return Response.redirect(url.origin + canonical,308)
-            const embeds = await bookmarkEmbeds([note], env, url.origin)
-            return publicNotePage(req,note,embeds[note.bookmark_id] || '')
+            const [embeds,adjacent] = await Promise.all([bookmarkEmbeds([note], env, url.origin),adjacentNotes(env.DB,note)])
+            return publicNotePage(req,note,embeds[note.bookmark_id] || '',adjacent)
           }
           return json({ error: '找不到隨筆' },404)
         }

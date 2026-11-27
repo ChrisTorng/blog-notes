@@ -13,7 +13,7 @@ export async function publicNotesList(req, env) {
     listNotes(env.DB, { tag, page }),
     noteTagCounts(env.DB),
   ])
-  const embeds = await bookmarkEmbeds(data.items, env, url.origin)
+  const embeds = await bookmarkEmbeds(data.items, env, url.origin, {showReading:false})
   const active = allTags.find(t => t.id === tag)
   const label = active ? active.displayName + ' · 隨筆' : '隨筆'
   const buildLink = (nextTag, nextPage = 1) => {
