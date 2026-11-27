@@ -31446,14 +31446,18 @@ __name(adjacentNotes, "adjacentNotes");
 // src/public-content.js
 var names = new Map(allTags.map((t) => [t.id, t.displayName]));
 var displayTag = /* @__PURE__ */ __name((id) => names.get(id) || id, "displayTag");
+function noteBodyHtml(note, siteUrl2, bookmarkHtml = "", { asReference = false } = {}) {
+  const bookmark = !asReference && note.bookmark_id ? '<aside class="mt-3 min-w-0 rounded-r-lg border-l-4 border-primary-500 bg-gray-50/60 px-3 py-2 dark:bg-gray-800/40" aria-label="\u5F15\u7528\u66F8\u7C64"><hr><p><strong>\u5F15\u7528\u66F8\u7C64</strong></p>' + (bookmarkHtml || '<p class="text-sm">\u5F15\u7528\u66F8\u7C64\uFF1A<a class="text-primary-500" href="/bookmarks/view/?id=' + encodeURIComponent(note.bookmark_id) + '">\u67E5\u770B\u76EE\u524D\u5167\u5BB9</a></p>') + "</aside>" : "";
+  const markdown = renderPublicMarkdown(note.markdown, siteUrl2);
+  return bookmark + '<div class="mt-3 prose max-w-none text-sm dark:prose-invert">' + markdown + "</div>";
+}
+__name(noteBodyHtml, "noteBodyHtml");
 function noteArticleHtml(note, siteUrl2, bookmarkHtml = "", { asReference = false } = {}) {
   const date = (note.published_at || note.created_at).slice(0, 10);
   const tags = note.tags.map((id) => '<a class="text-primary-500" href="' + htmlEscape(siteUrl2) + "/notes/?tag=" + encodeURIComponent(id) + '">#' + htmlEscape(displayTag(id)) + "</a>").join(" ");
-  const bookmark = !asReference && note.bookmark_id ? '<aside class="mt-3 min-w-0 rounded-r-lg border-l-4 border-primary-500 bg-gray-50/60 px-3 py-2 dark:bg-gray-800/40" aria-label="\u5F15\u7528\u66F8\u7C64"><hr><p><strong>\u5F15\u7528\u66F8\u7C64</strong></p>' + (bookmarkHtml || '<p class="text-sm">\u5F15\u7528\u66F8\u7C64\uFF1A<a class="text-primary-500" href="/bookmarks/view/?id=' + encodeURIComponent(note.bookmark_id) + '">\u67E5\u770B\u76EE\u524D\u5167\u5BB9</a></p>') + "</aside>" : "";
-  const markdown = renderPublicMarkdown(note.markdown, siteUrl2);
   const title = htmlEscape(noteTitle(note));
   const heading2 = asReference ? '<h2 class="mt-2 text-xl leading-snug font-bold"><a class="text-primary-500" href="' + htmlEscape(siteUrl2 + notePath(note)) + '">' + title + "</a></h2>" : '<h1 class="mt-2 text-xl leading-snug font-bold"><a class="text-primary-500 hover:text-primary-600 dark:hover:text-primary-400" href="' + htmlEscape(siteUrl2 + notePath(note)) + '">' + title + "</a></h1>";
-  return '<article class="border-b border-gray-300/40 py-4 dark:border-gray-700"><time class="text-xs text-gray-500" datetime="' + htmlEscape(date) + '">' + htmlEscape(date) + "</time>" + heading2 + bookmark + '<div class="mt-3 prose max-w-none text-sm dark:prose-invert">' + markdown + '</div><div class="mt-3 flex flex-wrap gap-2 text-sm">' + tags + "</div></article>";
+  return '<article class="border-b border-gray-300/40 py-4 dark:border-gray-700"><time class="text-xs text-gray-500" datetime="' + htmlEscape(date) + '">' + htmlEscape(date) + "</time>" + heading2 + noteBodyHtml(note, siteUrl2, bookmarkHtml, { asReference }) + '<div class="mt-3 flex flex-wrap gap-2 text-sm">' + tags + "</div></article>";
 }
 __name(noteArticleHtml, "noteArticleHtml");
 
@@ -37685,8 +37689,10 @@ function noteRssItem(n, siteUrl2, bookmarkHtmlById = {}) {
   return "<item><title>" + htmlEscape(noteTitle(n)) + "</title><link>" + htmlEscape(url) + '</link><guid isPermaLink="true">' + htmlEscape(guid) + "</guid><pubDate>" + pubDate(n.published_at || n.created_at) + "</pubDate><description>" + htmlEscape(content) + "</description><content:encoded>" + cdata2(content) + "</content:encoded>" + categories + "</item>";
 }
 __name(noteRssItem, "noteRssItem");
-function articleRssItem(item) {
-  return `<item><title>${htmlEscape(item.title)}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(item.summary)}</description>${item.tags.map((t) => `<category>${htmlEscape(displayTag(t))}</category>`).join("")}</item>`;
+function articleRssItem(item, siteUrl2) {
+  const tags = item.tags.map((t) => '<a href="' + htmlEscape(siteUrl2 + "/tags/" + encodeURIComponent(t) + "/") + '">#' + htmlEscape(displayTag(t)) + "</a>").join(" ");
+  const content = "<p>" + htmlEscape(item.summary) + "</p>" + (tags ? "<p>" + tags + "</p>" : "");
+  return `<item><title>${htmlEscape(item.title)}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(content)}</description><content:encoded>${cdata2(content)}</content:encoded>${item.tags.map((t) => `<category>${htmlEscape(displayTag(t))}</category>`).join("")}</item>`;
 }
 __name(articleRssItem, "articleRssItem");
 function wrapRss(items, siteUrl2, title, link2) {
@@ -37711,7 +37717,7 @@ function allRssXml(notes, blogItems, siteUrl2, tag2 = "", bookmarkHtmlById = {})
     })),
     ...blogItems.filter((item) => !tag2 || item.tags.includes(tag2))
   ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 100).map(
-    (item) => item.kind === "note" ? noteRssItem(item.note, siteUrl2, bookmarkHtmlById) : articleRssItem(item)
+    (item) => item.kind === "note" ? noteRssItem(item.note, siteUrl2, bookmarkHtmlById) : articleRssItem(item, siteUrl2)
   );
   return wrapRss(
     items,
@@ -37965,8 +37971,12 @@ async function combinedData(env, page, tag2 = "") {
   ].sort((a, b) => b.date.localeCompare(a.date));
   const total = first.total + blogItems.length;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const selected = page > pages ? [] : items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const notes = selected.filter((item) => item.kind === "note");
+  const origin = siteUrl(env);
+  const embeds = await bookmarkEmbeds(notes, env, origin, { showReading: false }).catch(() => ({}));
   return {
-    items: page > pages ? [] : items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    items: selected.map((item) => item.kind === "note" ? { ...item, html: noteBodyHtml(item, origin, embeds[item.bookmark_id] || "") } : item),
     page,
     pages,
     total,
