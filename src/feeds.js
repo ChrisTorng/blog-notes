@@ -31,8 +31,10 @@ function noteRssItem(n, siteUrl, bookmarkHtmlById = {}) {
     htmlEscape(content)+'</description><content:encoded>'+cdata(content)+
     '</content:encoded>'+categories+'</item>';
 }
-function articleRssItem(item) {
-  return `<item><title>${htmlEscape(item.title)}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(item.summary)}</description>${item.tags.map((t) => `<category>${htmlEscape(displayTag(t))}</category>`).join('')}</item>`
+function articleRssItem(item, siteUrl) {
+  const tags = item.tags.map(t=>'<a href="'+htmlEscape(siteUrl+'/tags/'+encodeURIComponent(t)+'/')+'">#'+htmlEscape(displayTag(t))+'</a>').join(' ');
+  const content = '<p>'+htmlEscape(item.summary)+'</p>'+(tags?'<p>'+tags+'</p>':'');
+  return `<item><title>${htmlEscape(item.title)}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(content)}</description><content:encoded>${cdata(content)}</content:encoded>${item.tags.map((t) => `<category>${htmlEscape(displayTag(t))}</category>`).join('')}</item>`
 }
 function wrapRss(items, siteUrl, title, link) {
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>${htmlEscape(title)}</title><link>${htmlEscape(`${siteUrl}${link}`)}</link><description>${htmlEscape(title)}</description><language>zh-TW</language>${items.join('')}</channel></rss>`
@@ -59,7 +61,7 @@ export function allRssXml(notes, blogItems, siteUrl, tag = '', bookmarkHtmlById 
     .map((item) =>
       item.kind === 'note'
         ? noteRssItem(item.note, siteUrl, bookmarkHtmlById)
-        : articleRssItem(item)
+        : articleRssItem(item, siteUrl)
     )
   return wrapRss(
     items,

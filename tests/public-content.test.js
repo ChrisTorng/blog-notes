@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { XMLValidator } from 'fast-xml-parser'
-import { noteArticleHtml } from '../src/public-content.js'
+import { noteArticleHtml, noteBodyHtml } from '../src/public-content.js'
 import { rssXml, allRssXml } from '../src/feeds.js'
 import { renderPublicMarkdown } from '../src/markdown.js'
 
@@ -59,4 +59,20 @@ test('note title itself is the permanent link in page and RSS',()=>{
   const html=noteArticleHtml(note,'https://example.org');
   assert.match(html,/<h1[^>]*><a[^>]*href="https:\/\/example\.org\/notes\/wo-de-xue-xi-xin-de\/"/);
   assert.doesNotMatch(html,/隨筆永久連結/);
+});
+
+
+test('mixed timeline shares note body without duplicating its heading or tags',()=>{
+  const body=noteBodyHtml(note,'https://example.org','<article>短摘要</article>');
+  assert.match(body,/引用書籤/);
+  assert.match(body,/短摘要/);
+  assert.match(body,/<strong>重點<\/strong>/);
+  assert.doesNotMatch(body,/隨筆永久連結|我的學習心得|#AI/);
+});
+test('combined article feed shows visible hashtags while retaining category metadata',()=>{
+  const feed=allRssXml([], [{kind:'blog',date:'2026-11-07',title:'Article',url:'https://example.org/blog/article/',summary:'摘要',tags:['ai']}], 'https://example.org');
+  assert.equal(XMLValidator.validate(feed),true);
+  assert.match(feed, /#AI/);
+  assert.match(feed, /<category>AI<\/category>/);
+  assert.match(feed, /https:\/\/example\.org\/tags\/ai\//);
 });

@@ -263,14 +263,14 @@ export default function PublicTimeline({
       </ul>
       {data.pages > 1 ? (
         <nav aria-label="分頁" className="flex items-center justify-between py-8">
-          <button onClick={() => go(page - 1)} disabled={page <= 1 || loading}>
-            上一頁
+          <button onClick={() => go(page - 1)} disabled={page <= 1 || loading} aria-label="上一頁">
+            ←
           </button>
           <span>
             第 {page} / {data.pages} 頁
           </span>
-          <button onClick={() => go(page + 1)} disabled={page >= data.pages || loading}>
-            下一頁
+          <button onClick={() => go(page + 1)} disabled={page >= data.pages || loading} aria-label="下一頁">
+            →
           </button>
         </nav>
       ) : null}

@@ -63,3 +63,14 @@ test('unpublished or deleted bookmark does not leak old text', async () => {
   assert.match(result[id], /目前未公開或已移除/)
   assert.ok(!result[id].includes('舊標題'))
 })
+
+
+test('short mixed-list reference requests omit the reading summary', async () => {
+  const result = await bookmarkEmbeds([note], {
+    BOOKMARKS: {fetch: async request => {
+      assert.equal(new URL(request.url).searchParams.get('reading'), '0')
+      return new Response('<article>短摘要</article>', {headers:{'Content-Type':'text/html'}})
+    }},
+  }, 'https://example.org', {showReading:false})
+  assert.match(result[id], /短摘要/)
+})

@@ -19,6 +19,7 @@ import { readLimitedText } from './http.js'
 import { publicNotePage } from './public-page.js'
 import { publicNotesList } from './public-list.js'
 import { bookmarkEmbeds } from './bookmark-embed.js'
+import { noteBodyHtml } from './public-content.js'
 import { allRssXml, readBlogItems, rssXml, sitemapXml } from './feeds.js'
 
 // UI is a static GitHub Pages build. Worker routes serve only JSON and RSS/XML.
@@ -184,8 +185,16 @@ async function combinedData(env, page, tag = '') {
   ].sort((a, b) => b.date.localeCompare(a.date))
   const total = first.total + blogItems.length
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const selected = page > pages ? [] : items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const notes = selected.filter(item => item.kind === 'note')
+  // Fetch only the visible page's references; never request the reading summary.
+  // An unavailable reference must not prevent the timeline itself from loading.
+  const origin = siteUrl(env)
+  const embeds = await bookmarkEmbeds(notes, env, origin, {showReading:false}).catch(() => ({}))
   return {
-    items: page > pages ? [] : items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    items: selected.map(item => item.kind === 'note'
+      ? {...item, html:noteBodyHtml(item,origin,embeds[item.bookmark_id] || '')}
+      : item),
     page, pages, total,
     warning: blogs.error,
   }
