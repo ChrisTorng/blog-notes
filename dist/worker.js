@@ -31452,7 +31452,7 @@ function noteArticleHtml(note, siteUrl2, bookmarkHtml = "", { asReference = fals
   const bookmark = !asReference && note.bookmark_id ? '<aside class="mt-3 min-w-0 rounded-r-lg border-l-4 border-primary-500 bg-gray-50/60 px-3 py-2 dark:bg-gray-800/40" aria-label="\u5F15\u7528\u66F8\u7C64"><hr><p><strong>\u5F15\u7528\u66F8\u7C64</strong></p>' + (bookmarkHtml || '<p class="text-sm">\u5F15\u7528\u66F8\u7C64\uFF1A<a class="text-primary-500" href="/bookmarks/view/?id=' + encodeURIComponent(note.bookmark_id) + '">\u67E5\u770B\u76EE\u524D\u5167\u5BB9</a></p>') + "</aside>" : "";
   const markdown = renderPublicMarkdown(note.markdown, siteUrl2);
   const title = htmlEscape(noteTitle(note));
-  const heading2 = asReference ? '<h2 class="mt-2 text-xl leading-snug font-bold"><a class="text-primary-500" href="' + htmlEscape(siteUrl2 + notePath(note)) + '">' + title + "</a></h2>" : '<h1 class="mt-2 text-xl leading-snug font-bold">' + title + "</h1>";
+  const heading2 = asReference ? '<h2 class="mt-2 text-xl leading-snug font-bold"><a class="text-primary-500" href="' + htmlEscape(siteUrl2 + notePath(note)) + '">' + title + "</a></h2>" : '<h1 class="mt-2 text-xl leading-snug font-bold"><a class="text-primary-500 hover:text-primary-600 dark:hover:text-primary-400" href="' + htmlEscape(siteUrl2 + notePath(note)) + '">' + title + "</a></h1>";
   return '<article class="border-b border-gray-300/40 py-4 dark:border-gray-700"><time class="text-xs text-gray-500" datetime="' + htmlEscape(date) + '">' + htmlEscape(date) + "</time>" + heading2 + bookmark + '<div class="mt-3 prose max-w-none text-sm dark:prose-invert">' + markdown + '</div><div class="mt-3 flex flex-wrap gap-2 text-sm">' + tags + "</div></article>";
 }
 __name(noteArticleHtml, "noteArticleHtml");
@@ -33334,8 +33334,8 @@ __name(readLimitedText, "readLimitedText");
 // src/public-page.js
 function adjacentNavigation({ prev, next } = {}) {
   if (!prev && !next) return "";
-  const link2 = /* @__PURE__ */ __name((item, direction) => item ? '<a href="' + htmlEscape(notePath(item)) + '" rel="' + direction + '" class="min-w-0 break-words ' + (direction === "next" ? "text-right " : "") + 'text-primary-500 hover:text-primary-600">' + (direction === "prev" ? "\u2190 \u4E0A\u4E00\u7BC7\uFF1A" + htmlEscape(noteTitle(item)) : "\u4E0B\u4E00\u7BC7\uFF1A" + htmlEscape(noteTitle(item)) + " \u2192") + "</a>" : "<span></span>", "link");
-  return '<nav aria-label="\u4E0A\u4E0B\u4E00\u7BC7" class="my-3 grid grid-cols-2 gap-3 text-sm">' + link2(prev, "prev") + link2(next, "next") + "</nav>";
+  const link2 = /* @__PURE__ */ __name((item, direction) => item ? '<a href="' + htmlEscape(notePath(item)) + '" rel="' + direction + '" aria-label="' + (direction === "prev" ? "\u4E0A\u4E00\u7BC7\uFF1A" : "\u4E0B\u4E00\u7BC7\uFF1A") + htmlEscape(noteTitle(item)) + '" class="min-w-0 break-words ' + (direction === "next" ? "text-right " : "") + 'text-primary-500 hover:text-primary-600">' + (direction === "prev" ? "\u2190 " + htmlEscape(noteTitle(item)) : htmlEscape(noteTitle(item)) + " \u2192") + "</a>" : '<span class="hidden sm:block"></span>', "link");
+  return '<nav aria-label="\u4E0A\u4E0B\u4E00\u7BC7" class="my-2 grid grid-cols-1 gap-1 text-sm sm:grid-cols-2 sm:gap-3">' + link2(prev, "prev") + link2(next, "next") + "</nav>";
 }
 __name(adjacentNavigation, "adjacentNavigation");
 async function publicNotePage(request, note, bookmarkHtml = "", adjacent = {}) {
@@ -33344,7 +33344,7 @@ async function publicNotePage(request, note, bookmarkHtml = "", adjacent = {}) {
   const canonical = origin + "/notes/" + encodeURIComponent(note.slug) + "/";
   const title = noteTitle(note);
   const text2 = plainText(note.markdown).slice(0, 180);
-  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">\u2190 \u96A8\u7B46\u5217\u8868</a>' + adjacentNavigation(adjacent) + '<div class="mt-4">' + noteArticleHtml(note, origin, bookmarkHtml) + "</div>" + adjacentNavigation(adjacent) + "</section>";
+  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="inline-block align-text-bottom"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg> \u96A8\u7B46\u5217\u8868</a>' + adjacentNavigation(adjacent) + '<div class="mt-4">' + noteArticleHtml(note, origin, bookmarkHtml) + "</div>" + adjacentNavigation(adjacent) + "</section>";
   const jsonld = JSON.stringify({
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -33426,16 +33426,12 @@ async function publicNotesList(req, env) {
     if (nextPage > 1) p.set("page", String(nextPage));
     return "/notes/" + (p.size ? "?" + p.toString() : "");
   }, "buildLink");
-  const cards = data.items.map((note) => {
-    const html = noteArticleHtml(note, url.origin, embeds[note.bookmark_id] || "");
-    const permalink = '<p class="text-sm text-primary-500"><a href="' + htmlEscape(notePath(note)) + '">\u96A8\u7B46\u6C38\u4E45\u9023\u7D50\uFF1A' + htmlEscape(noteTitle(note)) + "</a></p>";
-    return html + permalink;
-  }).join("");
+  const cards = data.items.map((note) => noteArticleHtml(note, url.origin, embeds[note.bookmark_id] || "")).join("");
   const tagLinks = allTags.map((t) => {
     const selected = tag2 === t.id;
     return '<a class="block rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ' + (selected ? "bg-gray-100 font-bold text-primary-500 dark:bg-gray-800" : "") + '" href="' + htmlEscape(buildLink(t.id)) + '">#' + htmlEscape(t.displayName) + ' <small class="text-gray-500">(' + Number(counts[t.id] || 0) + ")</small></a>";
   }).join("");
-  const pageLinks = data.pages > 1 ? '<nav aria-label="\u5206\u9801" class="mt-6 flex items-center justify-between gap-3 text-sm">' + (page > 1 ? '<a class="text-primary-500" href="' + htmlEscape(buildLink(tag2, page - 1)) + '">\u2190 \u4E0A\u4E00\u9801</a>' : "<span></span>") + "<span>" + data.page + " / " + data.pages + "</span>" + (page < data.pages ? '<a class="text-primary-500" href="' + htmlEscape(buildLink(tag2, page + 1)) + '">\u4E0B\u4E00\u9801 \u2192</a>' : "<span></span>") + "</nav>" : "";
+  const pageLinks = data.pages > 1 ? '<nav aria-label="\u5206\u9801" class="mt-6 flex items-center justify-between gap-3 text-sm">' + (page > 1 ? '<a class="text-primary-500" href="' + htmlEscape(buildLink(tag2, page - 1)) + '" aria-label="\u4E0A\u4E00\u9801">\u2190</a>' : "<span></span>") + "<span>" + data.page + " / " + data.pages + "</span>" + (page < data.pages ? '<a class="text-primary-500" href="' + htmlEscape(buildLink(tag2, page + 1)) + '" aria-label="\u4E0B\u4E00\u9801">\u2192</a>' : "<span></span>") + "</nav>" : "";
   const body = '<section class="w-full py-5 pb-12"><header class="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h1 class="heading-accent text-3xl font-extrabold sm:text-5xl">' + htmlEscape(label) + ' <small class="ml-2 text-lg font-normal text-gray-500">Notes</small></h1><p class="mt-3 text-gray-500 dark:text-gray-400">\u500B\u4EBA\u96A8\u7B46\u3001\u89C0\u5BDF\u8207\u5B78\u7FD2\u5FC3\u5F97</p></div><a class="text-primary-500 text-sm" href="/notes/feed.xml' + (tag2 ? "?tag=" + encodeURIComponent(tag2) : "") + '" type="application/rss+xml">\u96A8\u7B46 RSS</a></header><div class="grid grid-cols-1 items-start gap-6 md:grid-cols-[244px_minmax(0,1fr)] lg:gap-12"><aside class="hidden md:block"><a class="mb-2 block font-bold text-primary-500" href="/notes/">\u6240\u6709\u96A8\u7B46 (' + Number(data.total) + ')</a><nav class="space-y-1" aria-label="\u96A8\u7B46\u5206\u985E">' + tagLinks + '</nav></aside><div class="min-w-0"><form action="/notes/" method="get" class="mb-2 md:hidden"><label>\u5206\u985E <select name="tag" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:bg-gray-800"><option value="">\u6240\u6709\u96A8\u7B46</option>' + allTags.map((t) => '<option value="' + htmlEscape(t.id) + '"' + (tag2 === t.id ? " selected" : "") + ">" + htmlEscape(t.displayName) + "</option>").join("") + '</select></label><button type="submit" class="ml-2 rounded bg-primary-500 px-3 py-1 text-sm text-white">\u7BE9\u9078</button></form>' + (cards || '<p class="py-6 text-gray-500">\u76EE\u524D\u6C92\u6709\u96A8\u7B46\u3002</p>') + pageLinks + "</div></div></section>";
   const shell = await fetch(env.BLOG_SHELL_URL || url.origin + "/notes-shell/", { headers: { Accept: "text/html" } });
   if (!shell.ok) return new Response("\u7DB2\u7AD9\u7248\u578B\u66AB\u6642\u7121\u6CD5\u53D6\u5F97", { status: 503, headers: { "Cache-Control": "no-store" } });
