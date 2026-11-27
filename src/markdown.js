@@ -1,13 +1,14 @@
 import MarkdownIt from 'markdown-it'
+import { mathMarkdown, truncateMathTitle, mathParts } from './math-content.js'
 
-const md = new MarkdownIt({
+const md = mathMarkdown(new MarkdownIt({
   html: false,
   linkify: true,
   breaks: true,
   typographer: false,
-})
+}))
 
-export const renderMarkdown = (input) => md.render(String(input ?? ''))
+export const renderMarkdown = (input, mathMode = 'web') => md.render(String(input ?? ''), { mathMode })
 
 export const htmlEscape = (value) =>
   String(value ?? '')
@@ -23,9 +24,9 @@ export const htmlEscape = (value) =>
 
 // Public pages and RSS resolve relative links identically against the site's
 // root, never against the varying /notes/<slug>/ address.
-export function renderPublicMarkdown(input, siteUrl) {
+export function renderPublicMarkdown(input, siteUrl, mathMode = 'web') {
   const root = new URL('/', siteUrl).href
-  return renderMarkdown(input).replace(/\b(href|src)="([^"]*)"/g, (full, attribute, encoded) => {
+  return renderMarkdown(input, mathMode).replace(/\b(href|src)="([^"]*)"/g, (full, attribute, encoded) => {
     try {
       const value = encoded.replaceAll('&amp;', '&')
       const url = new URL(value, root)
@@ -48,6 +49,8 @@ export function plainText(markdown) {
   function visit(tokens) {
     for (const token of tokens) {
       if (token.children) visit(token.children)
+      else if (token.type === 'math_inline') text.push('$'+token.content+'$')
+      else if (token.type === 'math_block') text.push('$$'+token.content+'$$')
       else if (['text', 'code_inline', 'code_block', 'fence'].includes(token.type))
         text.push(token.content)
       else if (token.type === 'image') text.push(token.content)
@@ -66,6 +69,7 @@ export function automaticNoteTitle(markdown) {
   const first = String(markdown || '').split(/\r?\n/).find(line => line.trim()) || ''
   const value = plainText(first).replace(/\s+/g, ' ').trim()
   if (!value) return '隨筆'
+  if (mathParts(value).some(part => part.tex !== undefined)) return truncateMathTitle(value, 38)
   const chars = Array.from(value)
   const limit = 38
   const sentence = chars.findIndex(ch => /[。！？!?]/.test(ch))

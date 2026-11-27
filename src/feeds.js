@@ -1,4 +1,5 @@
 import { allTags } from './data.js'
+import { plainMathTitle, renderMathTitle } from './math-content.js'
 import { readLimitedText } from './http.js'
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import {
@@ -23,9 +24,9 @@ const cdata = html => '<![CDATA['+String(html).replaceAll(']]>',']]]]><![CDATA[>
 function noteRssItem(n, siteUrl, bookmarkHtmlById = {}) {
   const url = siteUrl + notePath(n);
   const guid = n.rss_guid || url;
-  const content = noteArticleHtml(n,siteUrl,bookmarkHtmlById[n.bookmark_id] || '');
+  const content = noteArticleHtml(n,siteUrl,bookmarkHtmlById[n.bookmark_id] || '', {mathMode:'rss'});
   const categories = n.tags.map(id=>'<category>'+htmlEscape(displayTag(id))+'</category>').join('');
-  return '<item><title>'+htmlEscape(noteTitle(n))+'</title><link>'+htmlEscape(url)+
+  return '<item><title>'+htmlEscape(plainMathTitle(noteTitle(n)))+'</title><link>'+htmlEscape(url)+
     '</link><guid isPermaLink="true">'+htmlEscape(guid)+'</guid><pubDate>'+
     pubDate(n.published_at || n.created_at)+'</pubDate><description>'+
     htmlEscape(content)+'</description><content:encoded>'+cdata(content)+
@@ -33,8 +34,8 @@ function noteRssItem(n, siteUrl, bookmarkHtmlById = {}) {
 }
 function articleRssItem(item, siteUrl) {
   const tags = item.tags.map(t=>'<a href="'+htmlEscape(siteUrl+'/tags/'+encodeURIComponent(t)+'/')+'">#'+htmlEscape(displayTag(t))+'</a>').join(' ');
-  const content = '<p>'+htmlEscape(item.summary)+'</p>'+(tags?'<p>'+tags+'</p>':'');
-  return `<item><title>${htmlEscape(item.title)}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(content)}</description><content:encoded>${cdata(content)}</content:encoded>${item.tags.map((t) => `<category>${htmlEscape(displayTag(t))}</category>`).join('')}</item>`
+  const content = '<p>'+renderMathTitle(item.summary,'rss')+'</p>'+(tags?'<p>'+tags+'</p>':'');
+  return `<item><title>${htmlEscape(plainMathTitle(item.title))}</title><link>${htmlEscape(item.url)}</link><guid isPermaLink="true">${htmlEscape(item.url)}</guid><pubDate>${pubDate(item.date)}</pubDate><description>${htmlEscape(content)}</description><content:encoded>${cdata(content)}</content:encoded>${item.tags.map((t) => `<category>${htmlEscape(displayTag(t))}</category>`).join('')}</item>`
 }
 function wrapRss(items, siteUrl, title, link) {
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>${htmlEscape(title)}</title><link>${htmlEscape(`${siteUrl}${link}`)}</link><description>${htmlEscape(title)}</description><language>zh-TW</language>${items.join('')}</channel></rss>`
