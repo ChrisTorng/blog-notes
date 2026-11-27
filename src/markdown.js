@@ -1,5 +1,5 @@
 import MarkdownIt from 'markdown-it'
-import { mathMarkdown, truncateMathTitle } from './math-content.js'
+import { mathMarkdown, truncateMathTitle, mathParts } from './math-content.js'
 
 const md = mathMarkdown(new MarkdownIt({
   html: false,
@@ -49,7 +49,8 @@ export function plainText(markdown) {
   function visit(tokens) {
     for (const token of tokens) {
       if (token.children) visit(token.children)
-      else if (token.type === 'math_inline') text.push('
+      else if (token.type === 'math_inline') text.push('$'+token.content+'$')
+      else if (token.type === 'math_block') text.push('$$'+token.content+'$$')
       else if (['text', 'code_inline', 'code_block', 'fence'].includes(token.type))
         text.push(token.content)
       else if (token.type === 'image') text.push(token.content)
@@ -68,102 +69,7 @@ export function automaticNoteTitle(markdown) {
   const first = String(markdown || '').split(/\r?\n/).find(line => line.trim()) || ''
   const value = plainText(first).replace(/\s+/g, ' ').trim()
   if (!value) return '隨筆'
-  if (/\$|\\[([]/.test(value)) return truncateMathTitle(value, 38)
-  const chars = Array.from(value)
-  const limit = 38
-  const sentence = chars.findIndex(ch => /[。！？!?]/.test(ch))
-  if (sentence >= 11 && sentence < limit)
-    return chars.slice(0, sentence + 1).join('').replace(/[。！？!?]+$/, '')
-  if (chars.length <= limit) return value
-  const slice = chars.slice(0, limit).join('')
-  // Prefer a nearby punctuation/word boundary, but avoid overly short labels.
-  const cut = Math.max(
-    slice.lastIndexOf('，'),
-    slice.lastIndexOf('；'),
-    slice.lastIndexOf('、'),
-    slice.lastIndexOf(' '),
-  )
-  return (cut >= 26 ? slice.slice(0, cut) : slice).trimEnd() + '…'
-}
-
-export function noteTitle(note) {
-  return note.title ||
-    note.bookmark_title ||
-    automaticNoteTitle(note.markdown)
-}
-
-export function notePath(note) {
-  const key = typeof note === 'string' ? note : note.slug || note.id
-  return '/notes/' + encodeURIComponent(key) + '/'
-}
-
-+token.content+'
-      else if (['text', 'code_inline', 'code_block', 'fence'].includes(token.type))
-        text.push(token.content)
-      else if (token.type === 'image') text.push(token.content)
-      else if (token.type === 'softbreak' || token.type === 'hardbreak' || token.block)
-        text.push(' ')
-    }
-  }
-  visit(md.parse(String(markdown ?? ''), {}))
-  return text.join('').replace(/\s+/g, ' ').trim()
-}
-
-// Titles remain optional in storage. Derive a concise, deterministic
-// presentation title for previews, public pages and RSS from the first
-// non-empty source line; never alter user-supplied titles or persisted text.
-export function automaticNoteTitle(markdown) {
-  const first = String(markdown || '').split(/\r?\n/).find(line => line.trim()) || ''
-  const value = plainText(first).replace(/\s+/g, ' ').trim()
-  if (!value) return '隨筆'
-  const chars = Array.from(value)
-  const limit = 38
-  const sentence = chars.findIndex(ch => /[。！？!?]/.test(ch))
-  if (sentence >= 11 && sentence < limit)
-    return chars.slice(0, sentence + 1).join('').replace(/[。！？!?]+$/, '')
-  if (chars.length <= limit) return value
-  const slice = chars.slice(0, limit).join('')
-  // Prefer a nearby punctuation/word boundary, but avoid overly short labels.
-  const cut = Math.max(
-    slice.lastIndexOf('，'),
-    slice.lastIndexOf('；'),
-    slice.lastIndexOf('、'),
-    slice.lastIndexOf(' '),
-  )
-  return (cut >= 26 ? slice.slice(0, cut) : slice).trimEnd() + '…'
-}
-
-export function noteTitle(note) {
-  return note.title ||
-    note.bookmark_title ||
-    automaticNoteTitle(note.markdown)
-}
-
-export function notePath(note) {
-  const key = typeof note === 'string' ? note : note.slug || note.id
-  return '/notes/' + encodeURIComponent(key) + '/'
-}
-
-)
-      else if (token.type === 'math_block') text.push('$'+token.content+'$')
-      else if (['text', 'code_inline', 'code_block', 'fence'].includes(token.type))
-        text.push(token.content)
-      else if (token.type === 'image') text.push(token.content)
-      else if (token.type === 'softbreak' || token.type === 'hardbreak' || token.block)
-        text.push(' ')
-    }
-  }
-  visit(md.parse(String(markdown ?? ''), {}))
-  return text.join('').replace(/\s+/g, ' ').trim()
-}
-
-// Titles remain optional in storage. Derive a concise, deterministic
-// presentation title for previews, public pages and RSS from the first
-// non-empty source line; never alter user-supplied titles or persisted text.
-export function automaticNoteTitle(markdown) {
-  const first = String(markdown || '').split(/\r?\n/).find(line => line.trim()) || ''
-  const value = plainText(first).replace(/\s+/g, ' ').trim()
-  if (!value) return '隨筆'
+  if (mathParts(value).some(part => part.tex !== undefined)) return truncateMathTitle(value, 38)
   const chars = Array.from(value)
   const limit = 38
   const sentence = chars.findIndex(ch => /[。！？!?]/.test(ch))
