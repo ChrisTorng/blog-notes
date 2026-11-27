@@ -31436,6 +31436,12 @@ async function exportNoteBatch(db, afterId = "") {
   return rows.results.map(decode3);
 }
 __name(exportNoteBatch, "exportNoteBatch");
+async function adjacentNotes(db, note) {
+  const lookup = /* @__PURE__ */ __name((comparison, order) => db.prepare(`SELECT id,slug,title,markdown FROM notes WHERE status='published' AND slug IS NOT NULL AND slug<>'' AND (COALESCE(published_at,created_at),created_at,id) ${comparison} (?,?,?) ORDER BY COALESCE(published_at,created_at) ${order},created_at ${order},id ${order} LIMIT 1`).bind(note.published_at || note.created_at, note.created_at, note.id).first(), "lookup");
+  const [prev, next] = await Promise.all([lookup("<", "DESC"), lookup(">", "ASC")]);
+  return { prev, next };
+}
+__name(adjacentNotes, "adjacentNotes");
 
 // src/public-content.js
 var names = new Map(allTags.map((t) => [t.id, t.displayName]));
@@ -33326,13 +33332,19 @@ async function readLimitedText(message2, limit) {
 __name(readLimitedText, "readLimitedText");
 
 // src/public-page.js
-async function publicNotePage(request, note, bookmarkHtml = "") {
+function adjacentNavigation({ prev, next } = {}) {
+  if (!prev && !next) return "";
+  const link2 = /* @__PURE__ */ __name((item, direction) => item ? '<a href="' + htmlEscape(notePath(item)) + '" rel="' + direction + '" class="min-w-0 break-words ' + (direction === "next" ? "text-right " : "") + 'text-primary-500 hover:text-primary-600">' + (direction === "prev" ? "\u2190 \u4E0A\u4E00\u7BC7\uFF1A" + htmlEscape(noteTitle(item)) : "\u4E0B\u4E00\u7BC7\uFF1A" + htmlEscape(noteTitle(item)) + " \u2192") + "</a>" : "<span></span>", "link");
+  return '<nav aria-label="\u4E0A\u4E0B\u4E00\u7BC7" class="my-3 grid grid-cols-2 gap-3 text-sm">' + link2(prev, "prev") + link2(next, "next") + "</nav>";
+}
+__name(adjacentNavigation, "adjacentNavigation");
+async function publicNotePage(request, note, bookmarkHtml = "", adjacent = {}) {
   const site = "ChrisTorng \u5B78\u7FD2\u5929\u5730";
   const origin = new URL(request.url).origin;
   const canonical = origin + "/notes/" + encodeURIComponent(note.slug) + "/";
   const title = noteTitle(note);
   const text2 = plainText(note.markdown).slice(0, 180);
-  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">\u2190 \u96A8\u7B46\u5217\u8868</a><div class="mt-4">' + noteArticleHtml(note, origin, bookmarkHtml) + "</div></section>";
+  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">\u2190 \u96A8\u7B46\u5217\u8868</a>' + adjacentNavigation(adjacent) + '<div class="mt-4">' + noteArticleHtml(note, origin, bookmarkHtml) + "</div>" + adjacentNavigation(adjacent) + "</section>";
   const jsonld = JSON.stringify({
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -33372,14 +33384,14 @@ __name(publicNotePage, "publicNotePage");
 
 // src/bookmark-embed.js
 var bookmarkIdPattern = /^[0-9a-f-]{36}$/;
-async function bookmarkEmbeds(notes, env, origin) {
+async function bookmarkEmbeds(notes, env, origin, { showReading = true } = {}) {
   const ids = [...new Set(notes.map((note) => note.bookmark_id).filter((id) => id && bookmarkIdPattern.test(id)))];
   if (!ids.length) return {};
   if (!env.BOOKMARKS) throw new Error("BOOKMARKS service binding is missing");
   const results = await Promise.all(ids.map(async (id) => {
     const response = await env.BOOKMARKS.fetch(
       new Request(
-        "https://bookmarks.internal/bookmarks/api/embed/" + id,
+        "https://bookmarks.internal/bookmarks/api/embed/" + id + (showReading ? "" : "?reading=0"),
         { headers: { "Accept": "text/html" } }
       )
     );
@@ -33405,7 +33417,7 @@ async function publicNotesList(req, env) {
     listNotes(env.DB, { tag: tag2, page }),
     noteTagCounts(env.DB)
   ]);
-  const embeds = await bookmarkEmbeds(data.items, env, url.origin);
+  const embeds = await bookmarkEmbeds(data.items, env, url.origin, { showReading: false });
   const active = allTags.find((t) => t.id === tag2);
   const label = active ? active.displayName + " \xB7 \u96A8\u7B46" : "\u96A8\u7B46";
   const buildLink = /* @__PURE__ */ __name((nextTag, nextPage = 1) => {
@@ -38051,8 +38063,8 @@ var worker = {
           if (note?.slug) {
             const canonical = "/notes/" + note.slug + "/";
             if (url.pathname !== canonical) return Response.redirect(url.origin + canonical, 308);
-            const embeds = await bookmarkEmbeds([note], env, url.origin);
-            return publicNotePage(req, note, embeds[note.bookmark_id] || "");
+            const [embeds, adjacent] = await Promise.all([bookmarkEmbeds([note], env, url.origin), adjacentNotes(env.DB, note)]);
+            return publicNotePage(req, note, embeds[note.bookmark_id] || "", adjacent);
           }
           return json({ error: "\u627E\u4E0D\u5230\u96A8\u7B46" }, 404);
         }
