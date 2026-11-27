@@ -53,3 +53,10 @@ test('Notes RSS preserves original GUID after changing its public permalink',()=
     assert.equal(XMLValidator.validate(xml),true);
   }
 });
+
+
+test('note title itself is the permanent link in page and RSS',()=>{
+  const html=noteArticleHtml(note,'https://example.org');
+  assert.match(html,/<h1[^>]*><a[^>]*href="https:\/\/example\.org\/notes\/wo-de-xue-xi-xin-de\/"/);
+  assert.doesNotMatch(html,/隨筆永久連結/);
+});

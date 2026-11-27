@@ -3,8 +3,8 @@ import { noteArticleHtml } from './public-content.js';
 
 function adjacentNavigation({prev,next}={}) {
   if (!prev && !next) return '';
-  const link=(item,direction)=>item ? '<a href="'+esc(notePath(item))+'" rel="'+direction+'" class="min-w-0 break-words '+(direction==='next'?'text-right ':'')+'text-primary-500 hover:text-primary-600">'+(direction==='prev'?'← 上一篇：'+esc(noteTitle(item)):'下一篇：'+esc(noteTitle(item))+' →')+'</a>' : '<span></span>';
-  return '<nav aria-label="上下一篇" class="my-3 grid grid-cols-2 gap-3 text-sm">'+link(prev,'prev')+link(next,'next')+'</nav>';
+  const link=(item,direction)=>item ? '<a href="'+esc(notePath(item))+'" rel="'+direction+'" aria-label="'+(direction==='prev'?'上一篇：':'下一篇：')+esc(noteTitle(item))+'" class="min-w-0 break-words '+(direction==='next'?'text-right ':'')+'text-primary-500 hover:text-primary-600">'+(direction==='prev'?'← '+esc(noteTitle(item)):esc(noteTitle(item))+' →')+'</a>' : '<span class="hidden sm:block"></span>';
+  return '<nav aria-label="上下一篇" class="my-2 grid grid-cols-1 gap-1 text-sm sm:grid-cols-2 sm:gap-3">'+link(prev,'prev')+link(next,'next')+'</nav>';
 }
 
 export async function publicNotePage(request, note, bookmarkHtml = '', adjacent={}) {
@@ -13,7 +13,7 @@ export async function publicNotePage(request, note, bookmarkHtml = '', adjacent=
   const canonical = origin + '/notes/' + encodeURIComponent(note.slug) + '/';
   const title = noteTitle(note);
   const text = plainText(note.markdown).slice(0, 180);
-  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/">← 隨筆列表</a>'+
+  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="inline-block align-text-bottom"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg> 隨筆列表</a>'+
     adjacentNavigation(adjacent)+'<div class="mt-4">'+noteArticleHtml(note,origin,bookmarkHtml)+'</div>'+adjacentNavigation(adjacent)+'</section>';
   const jsonld = JSON.stringify({
     '@context':'https://schema.org','@type':'BlogPosting',

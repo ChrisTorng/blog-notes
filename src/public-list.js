@@ -1,5 +1,5 @@
 import { allTags, listNotes, pageNumber, noteTagCounts } from './data.js'
-import { htmlEscape as esc, notePath, noteTitle } from './markdown.js'
+import { htmlEscape as esc } from './markdown.js'
 import { noteArticleHtml } from './public-content.js'
 import { bookmarkEmbeds } from './bookmark-embed.js'
 
@@ -22,14 +22,7 @@ export async function publicNotesList(req, env) {
     if (nextPage > 1) p.set('page', String(nextPage))
     return '/notes/' + (p.size ? '?' + p.toString() : '')
   }
-  const cards = data.items.map(note => {
-    const html = noteArticleHtml(note,url.origin,embeds[note.bookmark_id] || '')
-    // The article renderer intentionally shares the RSS contract, so add an
-    // explicit discoverable local URL outside it rather than copying fields.
-    const permalink = '<p class="text-sm text-primary-500"><a href="' +
-      esc(notePath(note)) + '">隨筆永久連結：' + esc(noteTitle(note)) + '</a></p>'
-    return html + permalink
-  }).join('')
+  const cards = data.items.map(note => noteArticleHtml(note,url.origin,embeds[note.bookmark_id] || '')).join('')
   const tagLinks = allTags.map(t => {
     const selected = tag === t.id
     return '<a class="block rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ' +
@@ -40,10 +33,10 @@ export async function publicNotesList(req, env) {
   const pageLinks = data.pages > 1 ?
     '<nav aria-label="分頁" class="mt-6 flex items-center justify-between gap-3 text-sm">' +
     (page > 1 ? '<a class="text-primary-500" href="' + esc(buildLink(tag,page-1)) +
-      '">← 上一頁</a>' : '<span></span>') +
+      '" aria-label="上一頁">←</a>' : '<span></span>') +
     '<span>' + data.page + ' / ' + data.pages + '</span>' +
     (page < data.pages ? '<a class="text-primary-500" href="' + esc(buildLink(tag,page+1)) +
-      '">下一頁 →</a>' : '<span></span>') + '</nav>' : ''
+      '" aria-label="下一頁">→</a>' : '<span></span>') + '</nav>' : ''
   const body = '<section class="w-full py-5 pb-12">' +
     '<header class="mb-6 flex flex-wrap items-start justify-between gap-4">' +
     '<div><h1 class="heading-accent text-3xl font-extrabold sm:text-5xl">' + esc(label) +

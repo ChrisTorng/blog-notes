@@ -20,7 +20,7 @@ export function noteArticleHtml(note,siteUrl,bookmarkHtml='',{asReference=false}
   const heading=asReference
     ? '<h2 class="mt-2 text-xl leading-snug font-bold"><a class="text-primary-500" href="'+
       esc(siteUrl+notePath(note))+'">'+title+'</a></h2>'
-    : '<h1 class="mt-2 text-xl leading-snug font-bold">'+title+'</h1>';
+    : '<h1 class="mt-2 text-xl leading-snug font-bold"><a class="text-primary-500 hover:text-primary-600 dark:hover:text-primary-400" href="'+esc(siteUrl+notePath(note))+'">'+title+'</a></h1>';
   return '<article class="border-b border-gray-300/40 py-4 dark:border-gray-700">'+
     '<time class="text-xs text-gray-500" datetime="'+esc(date)+'">'+esc(date)+'</time>'+
     heading+
