@@ -35,13 +35,13 @@ export class BookmarkReferences extends WorkerEntrypoint {
     return hasBookmarkReference(this.env.DB, id)
   }
 
-  async publishedHtml(ids) {
+  async publishedHtml(ids, mathMode='web') {
     const notes = await publishedNotesByBookmark(this.env.DB, ids)
     const site = this.env.SITE_URL || 'https://christorng.idv.tw'
     const html = {}
     for (const note of notes) {
       html[note.bookmark_id] ??= ''
-      html[note.bookmark_id] += noteArticleHtml(note, site, '', { asReference: true })
+      html[note.bookmark_id] += noteArticleHtml(note, site, '', { asReference: true, mathMode:mathMode==='rss'?'rss':'web' })
     }
     return html
   }
