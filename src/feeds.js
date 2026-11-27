@@ -20,24 +20,10 @@ function pubDate(date) {
 }
 
 const cdata = html => '<![CDATA['+String(html).replaceAll(']]>',']]]]><![CDATA[>')+']]>';
-
-// Only bookmark preview images carry this marker. Note body images and favicons
-// retain their original URLs; both RSS representations use the same HTML.
-export function rssPreviewHtml(html, siteUrl) {
-  const base = siteUrl.replace(/\/$/, '');
-  return String(html).replace(/<img\b[^>]*>/gi, tag => {
-    const path = tag.match(/\bdata-rss-preview="([^"]+)"/)?.[1];
-    if (!path || !/^\/bookmarks\/rss-image\/[0-9a-f-]{36}\/[0-9a-f]{8}\.jpg$/.test(path)) return tag;
-    return tag.replace(/\bsrc="[^"]*"/, 'src="' + base + path + '"')
-      .replace(/\sdata-rss-preview="[^"]*"/, '')
-      .replace(/\sloading="lazy"/, '').replace(/\sdecoding="async"/, '');
-  });
-}
-
 function noteRssItem(n, siteUrl, bookmarkHtmlById = {}) {
   const url = siteUrl + notePath(n);
   const guid = n.rss_guid || url;
-  const content = rssPreviewHtml(noteArticleHtml(n,siteUrl,bookmarkHtmlById[n.bookmark_id] || ''),siteUrl);
+  const content = noteArticleHtml(n,siteUrl,bookmarkHtmlById[n.bookmark_id] || '');
   const categories = n.tags.map(id=>'<category>'+htmlEscape(displayTag(id))+'</category>').join('');
   return '<item><title>'+htmlEscape(noteTitle(n))+'</title><link>'+htmlEscape(url)+
     '</link><guid isPermaLink="true">'+htmlEscape(guid)+'</guid><pubDate>'+

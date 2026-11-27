@@ -37669,19 +37669,10 @@ function pubDate(date) {
 }
 __name(pubDate, "pubDate");
 var cdata2 = /* @__PURE__ */ __name((html) => "<![CDATA[" + String(html).replaceAll("]]>", "]]]]><![CDATA[>") + "]]>", "cdata");
-function rssPreviewHtml(html, siteUrl2) {
-  const base2 = siteUrl2.replace(/\/$/, "");
-  return String(html).replace(/<img\b[^>]*>/gi, (tag2) => {
-    const path = tag2.match(/\bdata-rss-preview="([^"]+)"/)?.[1];
-    if (!path || !/^\/bookmarks\/rss-image\/[0-9a-f-]{36}\/[0-9a-f]{8}\.jpg$/.test(path)) return tag2;
-    return tag2.replace(/\bsrc="[^"]*"/, 'src="' + base2 + path + '"').replace(/\sdata-rss-preview="[^"]*"/, "").replace(/\sloading="lazy"/, "").replace(/\sdecoding="async"/, "");
-  });
-}
-__name(rssPreviewHtml, "rssPreviewHtml");
 function noteRssItem(n, siteUrl2, bookmarkHtmlById = {}) {
   const url = siteUrl2 + notePath(n);
   const guid = n.rss_guid || url;
-  const content = rssPreviewHtml(noteArticleHtml(n, siteUrl2, bookmarkHtmlById[n.bookmark_id] || ""), siteUrl2);
+  const content = noteArticleHtml(n, siteUrl2, bookmarkHtmlById[n.bookmark_id] || "");
   const categories = n.tags.map((id) => "<category>" + htmlEscape(displayTag(id)) + "</category>").join("");
   return "<item><title>" + htmlEscape(noteTitle(n)) + "</title><link>" + htmlEscape(url) + '</link><guid isPermaLink="true">' + htmlEscape(guid) + "</guid><pubDate>" + pubDate(n.published_at || n.created_at) + "</pubDate><description>" + htmlEscape(content) + "</description><content:encoded>" + cdata2(content) + "</content:encoded>" + categories + "</item>";
 }
