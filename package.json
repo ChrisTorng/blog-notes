@@ -19,7 +19,8 @@
     "jose": "^6.1.0",
     "markdown-it": "^14.1.0",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "katex": "0.16.45"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261027.1",
