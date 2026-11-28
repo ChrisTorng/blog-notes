@@ -26284,7 +26284,7 @@ var getCodePoint = (
   )
 );
 function getEscaper(regex, map2) {
-  return /* @__PURE__ */ __name(function escape5(data) {
+  return /* @__PURE__ */ __name(function escape6(data) {
     let match2;
     let lastIdx = 0;
     let result = "";
@@ -45559,8 +45559,28 @@ var katex = {
   __domTree
 };
 
-// src/math-content.js
+// src/rss-math.js
+var origin = "https://christorng.idv.tw/bookmarks/math/v1/";
 var escape4 = /* @__PURE__ */ __name((s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]), "escape");
+function rssMathImage(tex, display = false) {
+  const value = String(tex ?? "").trim();
+  const bytes = new TextEncoder().encode(value);
+  const fallback = '<span class="math-fallback">' + escape4(value) + "</span>";
+  if (!bytes.length || bytes.length > 1200 || /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)) return fallback;
+  if (/\\(?:includegraphics|html\w*|href|url|require|unicode|def|newcommand|renewcommand|gdef|class|style|color|bbox|verb|label|ref|tag)\b/i.test(value)) return fallback;
+  try {
+    katex.renderToString(value, { displayMode: display, throwOnError: true, trust: false, maxExpand: 200, maxSize: 20 });
+  } catch {
+    return fallback;
+  }
+  const encoded = btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+  const src = origin + (display ? "d" : "i") + "/" + encoded + ".png";
+  return '<img src="' + src + '" alt="' + escape4(value) + '" title="' + escape4(value) + '" style="max-width:100%;height:auto;' + (display ? "display:block;margin:0.5em auto" : "vertical-align:middle") + '" />';
+}
+__name(rssMathImage, "rssMathImage");
+
+// src/math-content.js
+var escape5 = /* @__PURE__ */ __name((s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]), "escape");
 var pattern = /(?<!\\)\\\((.+?)\\\)|(?<!\\)\\\[(.+?)\\\]|(?<![\\$])\$\$([^$\r\n]+?)\$\$|(?<![\\$])\$(?![\s$])([^$\r\n]+?)(?<![\s\\])\$(?![\d$])/g;
 function mathParts(text3) {
   const input = String(text3 ?? "");
@@ -45595,20 +45615,18 @@ function truncateMathTitle(text3, limit) {
 __name(truncateMathTitle, "truncateMathTitle");
 function formula(tex, display = false, mode = "web") {
   const value = String(tex);
-  if (value.length > 4e3) return escape4(value);
+  if (value.length > 4e3) return escape5(value);
   try {
-    if (mode === "rss") {
-      return '<span class="math-fallback" style="font-family:serif;white-space:normal">' + escape4(value) + "</span>";
-    }
+    if (mode === "rss") return rssMathImage(value, display);
     const html = katex.renderToString(value, { displayMode: display, throwOnError: true, trust: false, maxExpand: 1e3, maxSize: 20 });
     return '<span class="notranslate' + (display ? " block max-w-full overflow-x-auto" : "") + '">' + html + "</span>";
   } catch {
-    return escape4(value);
+    return escape5(value);
   }
 }
 __name(formula, "formula");
 function renderMathTitle(text3, mode = "web") {
-  return mathParts(text3).map((p) => p.tex === void 0 ? escape4(p.raw) : formula(p.tex, false, mode)).join("");
+  return mathParts(text3).map((p) => p.tex === void 0 ? escape5(p.raw) : formula(p.tex, false, mode)).join("");
 }
 __name(renderMathTitle, "renderMathTitle");
 function mathMarkdown(md2) {
@@ -47777,8 +47795,8 @@ async function adminIdentity(request, env) {
 }
 __name(adminIdentity, "adminIdentity");
 function allowedOrigin(request, env) {
-  const origin = request.headers.get("origin");
-  return !origin || origin === new URL(request.url).origin || env.AUTH_MODE === "local" && origin === env.ALLOWED_DEV_ORIGIN;
+  const origin2 = request.headers.get("origin");
+  return !origin2 || origin2 === new URL(request.url).origin || env.AUTH_MODE === "local" && origin2 === env.ALLOWED_DEV_ORIGIN;
 }
 __name(allowedOrigin, "allowedOrigin");
 async function verifyAccessToken(token, key, issuer, audience, email) {
@@ -47838,11 +47856,11 @@ function adjacentNavigation({ prev, next } = {}) {
 __name(adjacentNavigation, "adjacentNavigation");
 async function publicNotePage(request, note, bookmarkHtml = "", adjacent = {}) {
   const site = "ChrisTorng \u5B78\u7FD2\u5929\u5730";
-  const origin = new URL(request.url).origin;
-  const canonical = origin + "/notes/" + encodeURIComponent(note.slug) + "/";
+  const origin2 = new URL(request.url).origin;
+  const canonical = origin2 + "/notes/" + encodeURIComponent(note.slug) + "/";
   const title = noteTitle(note);
   const text3 = plainText(note.markdown).slice(0, 180);
-  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="inline-block align-text-bottom"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg> \u96A8\u7B46\u5217\u8868</a>' + adjacentNavigation(adjacent) + '<div class="mt-4">' + noteArticleHtml(note, origin, bookmarkHtml) + "</div>" + adjacentNavigation(adjacent) + "</section>";
+  const body = '<section class="w-full py-5 pb-12"><a class="text-primary-500 text-sm" href="/notes/"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="inline-block align-text-bottom"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg> \u96A8\u7B46\u5217\u8868</a>' + adjacentNavigation(adjacent) + '<div class="mt-4">' + noteArticleHtml(note, origin2, bookmarkHtml) + "</div>" + adjacentNavigation(adjacent) + "</section>";
   const jsonld = JSON.stringify({
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -47854,7 +47872,7 @@ async function publicNotePage(request, note, bookmarkHtml = "", adjacent = {}) {
     description: text3
   }).replace(/</g, "\\u003c");
   const meta = '<meta name="description" content="' + htmlEscape(text3) + '"><meta name="robots" content="index,follow"><link rel="canonical" href="' + htmlEscape(canonical) + '"><meta property="og:type" content="article"><meta property="og:title" content="' + htmlEscape(title) + '"><meta property="og:url" content="' + htmlEscape(canonical) + '"><meta property="og:description" content="' + htmlEscape(text3) + '"><link rel="alternate" type="application/rss+xml" title="\u6240\u6709\u96A8\u7B46 RSS | ' + site + '" href="/notes/feed.xml"><script type="application/ld+json">' + jsonld + "<\/script>";
-  const template = await fetch(origin + "/notes-shell/", { headers: { "Accept": "text/html" } });
+  const template = await fetch(origin2 + "/notes-shell/", { headers: { "Accept": "text/html" } });
   if (!template.ok) return new Response("\u7DB2\u7AD9\u7248\u578B\u66AB\u6642\u7121\u6CD5\u53D6\u5F97", { status: 503 });
   let rewrite = new HTMLRewriter().on("#notes-content", { element(el) {
     el.setInnerContent(body, { html: true });
@@ -47882,14 +47900,14 @@ __name(publicNotePage, "publicNotePage");
 
 // src/bookmark-embed.js
 var bookmarkIdPattern = /^[0-9a-f-]{36}$/;
-async function bookmarkEmbeds(notes, env, origin, { showReading = true } = {}) {
+async function bookmarkEmbeds(notes, env, origin2, { showReading = true, mathMode = "web" } = {}) {
   const ids = [...new Set(notes.map((note) => note.bookmark_id).filter((id) => id && bookmarkIdPattern.test(id)))];
   if (!ids.length) return {};
   if (!env.BOOKMARKS) throw new Error("BOOKMARKS service binding is missing");
   const results = await Promise.all(ids.map(async (id) => {
     const response = await env.BOOKMARKS.fetch(
       new Request(
-        "https://bookmarks.internal/bookmarks/api/embed/" + id + (showReading ? "" : "?reading=0"),
+        "https://bookmarks.internal/bookmarks/api/embed/" + id + "?" + new URLSearchParams({ reading: showReading ? "1" : "0", math: mathMode === "rss" ? "rss" : "web" }),
         { headers: { "Accept": "text/html" } }
       )
     );
@@ -47898,7 +47916,7 @@ async function bookmarkEmbeds(notes, env, origin, { showReading = true } = {}) {
     if (!response.ok) throw new Error("Cannot load referenced bookmark: " + response.status);
     const html = (await response.text()).replace(
       /\b(href|src)="\/(?!\/)/g,
-      (match2, attribute2) => attribute2 + '="' + origin + "/"
+      (match2, attribute2) => attribute2 + '="' + origin2 + "/"
     );
     return [id, html];
   }));
@@ -52467,10 +52485,10 @@ async function combinedData(env, page, tag2 = "") {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const selected = page > pages ? [] : items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const notes = selected.filter((item) => item.kind === "note");
-  const origin = siteUrl(env);
-  const embeds = await bookmarkEmbeds(notes, env, origin, { showReading: false }).catch(() => ({}));
+  const origin2 = siteUrl(env);
+  const embeds = await bookmarkEmbeds(notes, env, origin2, { showReading: false }).catch(() => ({}));
   return {
-    items: selected.map((item) => item.kind === "note" ? { ...item, html: noteBodyHtml(item, origin, embeds[item.bookmark_id] || "") } : item),
+    items: selected.map((item) => item.kind === "note" ? { ...item, html: noteBodyHtml(item, origin2, embeds[item.bookmark_id] || "") } : item),
     page,
     pages,
     total,
@@ -52526,7 +52544,7 @@ var worker = {
       if (path2 === "/notes/feed.xml" && req.method === "GET") {
         const tag2 = url.searchParams.get("tag") || "";
         const data = await listNotes(env.DB, { pageSize: 100, tag: tag2 });
-        const embeds = await bookmarkEmbeds(data.items, env, siteUrl(env));
+        const embeds = await bookmarkEmbeds(data.items, env, siteUrl(env), { mathMode: "rss" });
         return xml(rssXml(data.items, siteUrl(env), tag2, embeds), "application/rss+xml", Object.keys(embeds).length > 0);
       }
       if (path2 === "/notes/all/feed.xml" && req.method === "GET") {
@@ -52537,7 +52555,7 @@ var worker = {
         ]);
         if (blogs.error && !blogs.items.length)
           return new Response(blogs.error, { status: 503, headers: { "Retry-After": "60" } });
-        const embeds = await bookmarkEmbeds(notes.items, env, siteUrl(env));
+        const embeds = await bookmarkEmbeds(notes.items, env, siteUrl(env), { mathMode: "rss" });
         return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag2, embeds), "application/rss+xml", Object.keys(embeds).length > 0);
       }
       if (path2 === "/notes/sitemap.xml" && req.method === "GET") {
@@ -52613,13 +52631,13 @@ var BookmarkReferences = class extends WorkerEntrypoint {
   hasReference(id) {
     return hasBookmarkReference(this.env.DB, id);
   }
-  async publishedHtml(ids) {
+  async publishedHtml(ids, mathMode = "web") {
     const notes = await publishedNotesByBookmark(this.env.DB, ids);
     const site = this.env.SITE_URL || "https://christorng.idv.tw";
     const html = {};
     for (const note of notes) {
       html[note.bookmark_id] ??= "";
-      html[note.bookmark_id] += noteArticleHtml(note, site, "", { asReference: true });
+      html[note.bookmark_id] += noteArticleHtml(note, site, "", { asReference: true, mathMode: mathMode === "rss" ? "rss" : "web" });
     }
     return html;
   }
