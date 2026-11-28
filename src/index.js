@@ -248,7 +248,7 @@ const worker = {
       if (path === '/notes/feed.xml' && req.method === 'GET') {
         const tag = url.searchParams.get('tag') || ''
         const data = await listNotes(env.DB, { pageSize: 100, tag })
-        const embeds = await bookmarkEmbeds(data.items, env, siteUrl(env))
+        const embeds = await bookmarkEmbeds(data.items, env, siteUrl(env), {mathMode:'rss'})
         return xml(rssXml(data.items, siteUrl(env), tag, embeds), 'application/rss+xml', Object.keys(embeds).length > 0)
       }
       if (path === '/notes/all/feed.xml' && req.method === 'GET') {
@@ -259,7 +259,7 @@ const worker = {
         ])
         if (blogs.error && !blogs.items.length)
           return new Response(blogs.error, { status: 503, headers: { 'Retry-After': '60' } })
-        const embeds = await bookmarkEmbeds(notes.items, env, siteUrl(env))
+        const embeds = await bookmarkEmbeds(notes.items, env, siteUrl(env), {mathMode:'rss'})
         return xml(allRssXml(notes.items, blogs.items, siteUrl(env), tag, embeds), 'application/rss+xml', Object.keys(embeds).length > 0)
       }
       if (path === '/notes/sitemap.xml' && req.method === 'GET') {
